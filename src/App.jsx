@@ -894,7 +894,7 @@ function ContactPage() {
             {/* Contact details */}
             {[
               { i: "mail_outline", l: "Email", v: "maxgenterprise@gmail.com" },
-              { i: "phone", l: "Phone", v: "+27 000 000 0000" },
+              { i: "phone", l: "Phone", v: "+27 65 057 6778" },
               { i: "location_on", l: "Location", v: "South Africa" },
               { i: "schedule", l: "Hours", v: "Mon – Fri, 8AM – 6PM SAST" },
             ].map(c => (
