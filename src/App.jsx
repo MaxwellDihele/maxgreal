@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react"
 import logoNavbar from "./assets/logo-navbar.png";
 import logoHero   from "./assets/logo-hero.png";
 import faviconPng from "./assets/favicon.png";
@@ -1166,4 +1166,4 @@ export default function App() {
       <Footer setPage={setPage} />
     </div>
   );
-  }
+               }
