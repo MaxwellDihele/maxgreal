@@ -1138,6 +1138,10 @@ export default function App() {
   const [page, setPage] = useState("home");
   useEffect(() => { 
     window.scrollTo({ top: 0, behavior: "smooth" }); 
+  },[page]);
+  
+  // Load ARIA widget once on mount
+  useEffect(() => {
     window.ARIAWidgetConfig = {
       botName: "ARIA",
       welcomeMsg: "Hey! 👋 I'm ARIA. How can I help?",
@@ -1150,7 +1154,7 @@ export default function App() {
     document.body.appendChild(script);
 
     return () => document.body.removeChild(script);
-  },[page]);
+  }, []);
 
   const renderPage = () => {
     switch (page) {
