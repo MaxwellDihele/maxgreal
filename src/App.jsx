@@ -1090,7 +1090,7 @@ function Footer({ setPage }) {
           ))}
           <div>
             <div style={{ color: "#94A3B8", fontSize: ".72rem", letterSpacing: ".15em", fontWeight: 700, marginBottom: "1rem" }}>CONTACT</div>
-            {[{ i: "mail_outline", t: "maxgenterprise@gmail.com" }, { i: "phone", t: "+27 000 000 0000" }, { i: "location_on", t: "South Africa" }, { i: "schedule", t: "Mon–Fri, 8AM–6PM SAST" }].map(c => (
+            {[{ i: "mail_outline", t: "maxgenterprise@gmail.com" }, { i: "phone", t: "+27 65 057 6778" }, { i: "location_on", t: "South Africa" }, { i: "schedule", t: "Mon–Fri, 8AM–6PM SAST" }].map(c => (
               <div key={c.t} style={{ display: "flex", alignItems: "center", gap: ".5rem", color: "#64748B", fontSize: ".83rem", marginBottom: ".5rem" }}>
                 <Icon name={c.i} size={15} color="#3B82F6" />{c.t}
               </div>
