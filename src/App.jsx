@@ -1153,7 +1153,6 @@ export default function App() {
     script.async = true;
     document.body.appendChild(script);
 
-    return () => document.body.removeChild(script);
   }, []);
 
   const renderPage = () => {
