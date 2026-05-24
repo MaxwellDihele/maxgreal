@@ -1,4 +1,32 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import logoNavbar from "./assets/logo-navbar.png";
+import logoHero   from "./assets/logo-hero.png";
+import faviconPng from "./assets/favicon.png";
+
+/* ── Favicon + Page Title injector ── */
+const FAVICON_URI  = faviconPng;
+const NAV_LOGO_URI = logoNavbar;
+
+function FaviconInjector() {
+  useEffect(() => {
+    // Set favicon
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.type = 'image/png';
+    link.href = FAVICON_URI;
+
+    // Set page title
+    document.title = 'MAXG Enterprise | AI · Web · Database · 4IR';
+
+    // Set meta description
+    let meta = document.querySelector("meta[name='description']");
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.appendChild(meta); }
+    meta.content = 'MAXG Enterprise — AI Development, Web Platforms, Database Architecture & 4IR Digital Transformation for modern businesses.';
+  }, []);
+  return null;
+}
+
+
 
 /* ══════════════════════════════════════════
    GLOBAL STYLES + GOOGLE FONTS + MATERIAL ICONS
@@ -232,7 +260,7 @@ function Navbar({ page, setPage }) {
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 clamp(1rem,4vw,2.5rem)", height: 68 }}>
         {/* Logo */}
         <button onClick={() => setPage("home")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: ".7rem" }}>
-          <div style={{ width: 40, height: 40, borderRadius: 10, background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 22px rgba(59,130,246,0.5)", fontSize: 20, color: "white", fontFamily: "Georgia,serif" }}>♟</div>
+          <img src={NAV_LOGO_URI} alt="MAXG Enterprise Logo" style={{ width: 44, height: 44, objectFit: "contain", filter: "drop-shadow(0 0 8px rgba(0,200,255,0.7))", transition: "filter 0.3s" }} onMouseEnter={e => e.target.style.filter="drop-shadow(0 0 16px rgba(0,200,255,1))"} onMouseLeave={e => e.target.style.filter="drop-shadow(0 0 8px rgba(0,200,255,0.7))"} />
           <div style={{ textAlign: "left" }}>
             <div style={{ color: "white", fontWeight: 800, fontSize: "1rem", letterSpacing: ".1em", fontFamily: "var(--ff-display)" }}>MAXG</div>
             <div style={{ color: "#3B82F6", fontSize: ".5rem", letterSpacing: ".35em", fontWeight: 700 }}>ENTERPRISE</div>
@@ -1132,9 +1160,10 @@ export default function App() {
   return (
     <div style={{ background: "var(--bg)", minHeight: "100vh", color: "white", overflowX: "hidden" }}>
       <GlobalStyle />
+      <FaviconInjector />
       <Navbar page={page} setPage={setPage} />
       <main>{renderPage()}</main>
       <Footer setPage={setPage} />
     </div>
   );
-}
+  }
