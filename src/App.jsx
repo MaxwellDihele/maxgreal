@@ -1136,7 +1136,21 @@ function HomePage({ setPage }) {
 ══════════════════════════════════════════ */
 export default function App() {
   const [page, setPage] = useState("home");
-  useEffect(() => { window.scrollTo({ top: 0, behavior: "smooth" }); }, [page]);
+  useEffect(() => { 
+    window.scrollTo({ top: 0, behavior: "smooth" }); 
+    window.ARIAWidgetConfig = {
+      botName: "ARIA",
+      welcomeMsg: "Hey! 👋 I'm ARIA. How can I help?",
+      quickReplies: ["Pricing", "AI services", "Book demo"],
+    };
+
+    const script = document.createElement("script");
+    script.src = "https://aria-widget-gray.vercel.app/widget.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => document.body.removeChild(script);
+  },[page]);
 
   const renderPage = () => {
     switch (page) {
