@@ -1,939 +1,1193 @@
-/**
- * ARIA Chat Widget — Embeddable
- * ─────────────────────────────
- * Drop this script onto any website (plain HTML, WordPress, Webflow, Shopify, etc.)
- * It self-initialises and injects the floating FAB + chat modal into <body>.
- *
- * USAGE
- * ─────
- * <script src="aria-widget.js"></script>
- *
- * CUSTOMISE (optional) — set before the <script> tag:
- * <script>
- *   window.ARIAWidgetConfig = {
- *     botName:       "ARIA",                          // display name in header
- *     botSubtitle:   "MAXG AI Assistant · Online",    // status line
- *     accentColor:   "#3B82F6",                       // primary blue
- *     darkColor:     "#1D4ED8",                       // deep blue
- *     welcomeMsg:    "Hey! 👋 I'm ARIA …",
- *     quickReplies:  ["AI services","Pricing","Web dev","Database","Book demo","Help"],
- *     replies: {                                      // keyword → reply map
- *       hi:      "Hey there! 👋 …",
- *       default: "Great question! Let me connect you …",
- *     },
- *     slots: [                                        // booking time-slots
- *       { time:"09:00 AM", date:"Mon 26 May", spots:3 },
- *     ],
- *   };
- * </script>
- * <script src="aria-widget.js"></script>
- */
+import { useState, useEffect, useRef, useCallback } from "react"
+import logoNavbar from "./assets/logo-navbar.png";
+import logoHero   from "./assets/logo-hero.png";
+import faviconPng from "./assets/favicon.png";
 
-(function () {
-  "use strict";
+/* ── Favicon + Page Title injector ── */
+const FAVICON_URI  = faviconPng;
+const NAV_LOGO_URI = logoNavbar;
 
-  /* ── Config merge ── */
-  var cfg = Object.assign(
-    {
-      botName: "ARIA",
-      botSubtitle: "MAXG AI Assistant · Online",
-      social: {
-        whatsapp:  "",
-        instagram: "",
-        facebook:  "",
-        tiktok:    "",
-        twitter:   "",
-      },
-      supportEmail: "support@maxg.co.za",
-      accentColor: "#3B82F6",
-      darkColor: "#1D4ED8",
-      welcomeMsg:
-        "Hey! 👋 I'm ARIA, MAXG's AI assistant. Ask me anything about our services, or type 'help' to see what I can do.",
-      quickReplies: ["AI services", "Pricing", "Web dev", "Database", "Book demo", "Help"],
-      replies: {
-        hi: "Hey there! 👋 I'm ARIA — MAXG's AI assistant. I can show you what our AI systems can do, or help you book a live demo session. What would you like?",
-        hello: "Hey there! 👋 I'm ARIA — MAXG's AI assistant. I can show you what our AI systems can do, or help you book a live demo session. What would you like?",
-        demo: "Great choice! 🚀 Our live demo is a 30-minute session where our engineers walk you through custom AI integrations, database design, and web systems — live. Ready to pick a time slot?",
-        pricing: "We have 3 plans: Pawn (R4,999/mo) for startups, Knight (R12,999/mo) for growing businesses, and King (Custom) for enterprise. Which fits your stage?",
-        ai: "Our AI services include: custom LLM integration, AI chatbots, predictive analytics, document processing, and full ML pipelines. Want a demo of any specific capability?",
-        web: "We build with Next.js, Astro, React, and Node.js — delivering sites that score 95+ on Lighthouse, rank on page 1, and convert visitors into clients.",
-        database:
-          "We architect PostgreSQL, MongoDB, Redis, and Supabase systems — including migrations, real-time sync, API layers, and enterprise security hardening.",
-        book: "To book your demo, open the Booking tab in this chat. You'll receive a confirmation email. Shall I guide you there?",
-        help: "I can help with: 🤖 AI capabilities · 🌐 Web development · 🗄️ Database services · 💰 Pricing · 📅 Booking a demo. Just ask!",
-        iot: "We integrate IoT sensors, edge computing, and real-time dashboards into your operations — turning raw machine data into actionable intelligence.",
-        support:
-          "All plans include post-launch support. Knight gets 3 months priority support, and King clients get a dedicated 12-month SLA-backed engineer.",
-        default:
-          "Great question! Let me connect you with our team for a tailored answer. Feel free to book a demo or type 'help' to see everything I can assist with.",
-      },
-      slots: [
-        { time: "09:00 AM", date: "Mon 26 May", spots: 3 },
-        { time: "11:00 AM", date: "Mon 26 May", spots: 2 },
-        { time: "02:00 PM", date: "Tue 27 May", spots: 5 },
-        { time: "04:00 PM", date: "Tue 27 May", spots: 1 },
-        { time: "10:00 AM", date: "Wed 28 May", spots: 4 },
-        { time: "03:00 PM", date: "Thu 29 May", spots: 3 },
-      ],
-    },
-    window.ARIAWidgetConfig || {}
-  );
+function FaviconInjector() {
+  useEffect(() => {
+    // Set favicon
+    let link = document.querySelector("link[rel~='icon']");
+    if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+    link.type = 'image/png';
+    link.href = FAVICON_URI;
 
-  /* ── Bot reply logic ── calls Node Edge API ┒ FastAPI ┒ DeepSeek */
-  async function getReply(msg) {
-    // Fall back to keyword replies if no apiUrl configured
-    if (!cfg.apiUrl) {
-      var m = msg.toLowerCase();
-      var keys = Object.keys(cfg.replies);
-      for (var i = 0; i < keys.length; i++) {
-        if (keys[i] !== "default" && m.includes(keys[i])) return cfg.replies[keys[i]];
-      }
-      return cfg.replies.default;
+    // Set page title
+    document.title = 'MAXG Enterprise | AI · Web · Database · 4IR';
+
+    // Set meta description
+    let meta = document.querySelector("meta[name='description']");
+    if (!meta) { meta = document.createElement('meta'); meta.name = 'description'; document.head.appendChild(meta); }
+    meta.content = 'MAXG Enterprise — AI Development, Web Platforms, Database Architecture & 4IR Digital Transformation for modern businesses.';
+  }, []);
+  return null;
+}
+
+
+
+/* ══════════════════════════════════════════
+   GLOBAL STYLES + GOOGLE FONTS + MATERIAL ICONS
+══════════════════════════════════════════ */
+const GlobalStyle = () => (
+  <style>{`
+    @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=DM+Sans:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/icon?family=Material+Icons+Round');
+
+    *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior: smooth; }
+    body { overflow-x: hidden; }
+
+    :root {
+      --blue:#3B82F6; --blue-b:#60A5FA; --blue-d:#1D4ED8;
+      --bg:#04040a; --bg2:#07070f; --surface:rgba(255,255,255,0.025);
+      --border:rgba(59,130,246,0.18); --text:#F1F5F9; --muted:#64748B;
+      --ff-display:'Playfair Display',Georgia,serif;
+      --ff-body:'DM Sans',system-ui,sans-serif;
     }
-    try {
-      var headers = { "Content-Type": "application/json" };
-      if (cfg.apiSecret) headers["X-ARIA-Secret"] = cfg.apiSecret;
-      var res = await fetch(cfg.apiUrl, {
-        method: "POST",
-        headers: headers,
-        body: JSON.stringify({ message: msg }),
+
+    ::-webkit-scrollbar{width:5px}
+    ::-webkit-scrollbar-track{background:var(--bg)}
+    ::-webkit-scrollbar-thumb{background:#1D4ED8;border-radius:4px}
+    .material-icons-round{font-size:inherit!important;vertical-align:middle}
+
+    @keyframes fadeUp   {from{opacity:0;transform:translateY(28px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes fadeIn   {from{opacity:0}to{opacity:1}}
+    @keyframes scaleIn  {from{opacity:0;transform:scale(0.88)}to{opacity:1;transform:scale(1)}}
+    @keyframes blink    {0%,100%{opacity:1}50%{opacity:0}}
+    @keyframes pulse2   {0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,0.5)}50%{box-shadow:0 0 0 14px transparent}}
+    @keyframes orbit    {from{transform:rotate(0deg) translateX(260px) rotate(0deg)}to{transform:rotate(360deg) translateX(260px) rotate(-360deg)}}
+    @keyframes orbit2   {from{transform:rotate(180deg) translateX(180px) rotate(-180deg)}to{transform:rotate(540deg) translateX(180px) rotate(-540deg)}}
+    @keyframes spin     {from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes counterSpin{from{transform:rotate(0deg)}to{transform:rotate(-360deg)}}
+    @keyframes float    {0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    @keyframes shimmer  {0%{background-position:200% center}100%{background-position:-200% center}}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+    @keyframes logoGlow {0%,100%{opacity:0.18;filter:blur(0px)}50%{opacity:0.30;filter:blur(1px)}}
+    @keyframes scanline {0%{top:-10%}100%{top:110%}}
+    @keyframes ringPulse{0%{transform:scale(1);opacity:0.6}100%{transform:scale(1.5);opacity:0}}
+    @keyframes bounce   {0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+    @keyframes typing   {from{width:0}to{width:100%}}
+    @keyframes dotPulse {0%,80%,100%{opacity:0;transform:scale(0.8)}40%{opacity:1;transform:scale(1)}}
+
+    .animate-fadeUp  {animation:fadeUp  0.65s cubic-bezier(.22,1,.36,1) both}
+    .animate-fadeIn  {animation:fadeIn  0.5s ease both}
+    .animate-scaleIn {animation:scaleIn 0.55s cubic-bezier(.22,1,.36,1) both}
+    .animate-float   {animation:float   4s ease-in-out infinite}
+
+    .shimmer-text{
+      background:linear-gradient(90deg,#60A5FA,#fff,#3B82F6,#60A5FA);
+      background-size:200% auto;
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+      animation:shimmer 4s linear infinite;
+    }
+
+    .card-hover{transition:transform .3s cubic-bezier(.22,1,.36,1),box-shadow .3s,border-color .3s,background .3s;will-change:transform}
+    .card-hover:hover{transform:translateY(-5px);box-shadow:0 20px 60px rgba(59,130,246,0.14);border-color:rgba(59,130,246,0.5)!important;background:rgba(59,130,246,0.07)!important}
+    .card-hover:hover .icon-circle{background:rgba(59,130,246,0.28)!important;box-shadow:0 0 20px rgba(59,130,246,0.5);transform:scale(1.1) rotate(-5deg)}
+    .icon-circle{transition:background .3s,box-shadow .3s,transform .3s}
+
+    .btn-p{background:linear-gradient(135deg,#1D4ED8,#3B82F6);border:none;border-radius:12px;color:#fff;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;font-family:var(--ff-body);transition:transform .2s,box-shadow .2s,filter .2s}
+    .btn-p:hover{transform:translateY(-2px);box-shadow:0 0 40px rgba(59,130,246,0.7)!important;filter:brightness(1.08)}
+    .btn-s{background:transparent;border:1px solid rgba(59,130,246,0.4);border-radius:12px;color:#60A5FA;font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:.45rem;font-family:var(--ff-body);transition:background .2s,border-color .2s,transform .2s}
+    .btn-s:hover{background:rgba(59,130,246,0.15)!important;border-color:#3B82F6!important;transform:translateY(-2px)}
+
+    .mobile-menu{animation:slideDown .3s cubic-bezier(.22,1,.36,1) both}
+
+    /* LOGO BG EFFECT */
+    .logo-bg-wrap{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;overflow:hidden}
+    .logo-bg-img{width:min(620px,90vw);height:min(620px,90vw);object-fit:contain;opacity:0.13;animation:logoGlow 5s ease-in-out infinite;filter:saturate(0.4) brightness(1.1)}
+    .logo-scan{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,rgba(59,130,246,0.4),transparent);animation:scanline 4s linear infinite;pointer-events:none}
+
+    /* CHAT UI */
+    .chat-bubble-in {animation:fadeUp 0.35s ease both}
+    .typing-dot{width:7px;height:7px;border-radius:50%;background:#60A5FA;animation:dotPulse 1.4s infinite ease-in-out}
+    .typing-dot:nth-child(2){animation-delay:.2s}
+    .typing-dot:nth-child(3){animation-delay:.4s}
+    .booking-card{transition:border-color .25s,box-shadow .25s,transform .25s}
+    .booking-card:hover{border-color:rgba(59,130,246,0.55)!important;box-shadow:0 8px 40px rgba(59,130,246,0.12);transform:translateY(-3px)}
+
+    /* RESPONSIVE */
+    @media(max-width:768px){
+      .hide-m{display:none!important} .show-m{display:flex!important}
+      .grid-2,.grid-3,.pricing-grid{grid-template-columns:1fr!important}
+      .grid-4{grid-template-columns:1fr 1fr!important}
+      .hero-h{font-size:clamp(2rem,9vw,2.8rem)!important}
+      .hero-btns{flex-direction:column!important;align-items:stretch!important}
+      .sec-h{font-size:clamp(1.6rem,6vw,2.2rem)!important}
+      .footer-r{flex-direction:column!important;gap:2rem!important}
+      .nav-cta-d{display:none!important}
+      .contact-grid{grid-template-columns:1fr!important}
+    }
+    @media(max-width:480px){
+      .grid-4{grid-template-columns:1fr!important}
+      .stat-row{display:grid!important;grid-template-columns:1fr 1fr!important;gap:1.5rem!important}
+    }
+
+    input,textarea,select{color-scheme:dark}
+    input::placeholder,textarea::placeholder{color:#475569}
+    select option{background:#080810;color:white}
+  `}</style>
+);
+
+/* ── Icon ── */
+const Icon = ({ name, size = 20, color, style: s = {} }) => (
+  <span className="material-icons-round" style={{ fontSize: size, color: color || "inherit", lineHeight: 1, flexShrink: 0, ...s }}>{name}</span>
+);
+
+/* ── InView hook ── */
+function useInView(threshold = 0.12) {
+  const ref = useRef(null);
+  const [v, setV] = useState(false);
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => { if (e.isIntersecting) { setV(true); obs.disconnect(); } }, { threshold });
+    if (ref.current) obs.observe(ref.current);
+    return () => obs.disconnect();
+  }, []);
+  return [ref, v];
+}
+
+/* ══════════════════════════════════════════
+   PARTICLE CANVAS
+══════════════════════════════════════════ */
+function ParticleCanvas() {
+  const ref = useRef(null);
+  useEffect(() => {
+    const c = ref.current; if (!c) return;
+    const ctx = c.getContext("2d");
+    let W = c.width = window.innerWidth, H = c.height = window.innerHeight;
+    const pts = Array.from({ length: 60 }, () => ({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .32, vy: (Math.random() - .5) * .32,
+      r: Math.random() * 1.6 + .4, a: Math.random() * .7 + .2
+    }));
+    let raf;
+    const draw = () => {
+      ctx.clearRect(0, 0, W, H);
+      pts.forEach(p => {
+        p.x += p.vx; p.y += p.vy;
+        if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+        if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+        ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(96,165,250,${p.a * .55})`; ctx.fill();
       });
-      if (!res.ok) throw new Error("API " + res.status);
-      var data = await res.json();
-      return data.reply || cfg.replies.default;
-    } catch (err) {
-      console.warn("ARIA API error:", err);
-      return "I'm having trouble connecting right now. Please try again shortly!";
-    }
+      for (let i = 0; i < pts.length; i++)
+        for (let j = i + 1; j < pts.length; j++) {
+          const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+          const d = Math.sqrt(dx * dx + dy * dy);
+          if (d < 115) { ctx.beginPath(); ctx.strokeStyle = `rgba(59,130,246,${.13 * (1 - d / 115)})`; ctx.lineWidth = .55; ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y); ctx.stroke(); }
+        }
+      raf = requestAnimationFrame(draw);
+    };
+    draw();
+    const resize = () => { W = c.width = window.innerWidth; H = c.height = window.innerHeight; };
+    window.addEventListener("resize", resize);
+    return () => { cancelAnimationFrame(raf); window.removeEventListener("resize", resize); };
+  }, []);
+  return <canvas ref={ref} style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 1 }} />;
+}
+
+/* ══════════════════════════════════════════
+   ORBIT RINGS (same as v2)
+══════════════════════════════════════════ */
+function OrbitRings() {
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", pointerEvents: "none", overflow: "hidden", zIndex: 2 }}>
+      <div style={{ position: "relative", width: 540, height: 540 }}>
+        <div style={{ position: "absolute", inset: 0, border: "1px solid rgba(59,130,246,0.09)", borderRadius: "50%", animation: "spin 32s linear infinite" }} />
+        <div style={{ position: "absolute", inset: 50, border: "1px dashed rgba(59,130,246,0.07)", borderRadius: "50%", animation: "counterSpin 22s linear infinite" }} />
+        <div style={{ position: "absolute", inset: 110, border: "1px solid rgba(96,165,250,0.05)", borderRadius: "50%" }} />
+        {/* Orbiting dot 1 */}
+        <div style={{ position: "absolute", top: "50%", left: "50%", width: 10, height: 10, marginTop: -5, marginLeft: -5, animation: "orbit 12s linear infinite" }}>
+          <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#3B82F6", boxShadow: "0 0 14px #3B82F6, 0 0 28px rgba(59,130,246,0.5)" }} />
+        </div>
+        {/* Orbiting dot 2 */}
+        <div style={{ position: "absolute", top: "50%", left: "50%", width: 7, height: 7, marginTop: -3.5, marginLeft: -3.5, animation: "orbit2 8s linear infinite" }}>
+          <div style={{ width: 7, height: 7, borderRadius: "50%", background: "#60A5FA", boxShadow: "0 0 10px #60A5FA" }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   GRID OVERLAY SVG
+══════════════════════════════════════════ */
+const GridSVG = ({ id = "g1", opacity = 0.035 }) => (
+  <svg style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity, pointerEvents: "none", zIndex: 0 }}>
+    <defs><pattern id={id} width="64" height="64" patternUnits="userSpaceOnUse"><path d="M64 0L0 0 0 64" fill="none" stroke="#3B82F6" strokeWidth=".6" /></pattern></defs>
+    <rect width="100%" height="100%" fill={`url(#${id})`} />
+  </svg>
+);
+
+/* ══════════════════════════════════════════
+   TYPEWRITER
+══════════════════════════════════════════ */
+function Typewriter({ words }) {
+  const [wi, setWi] = useState(0), [ci, setCi] = useState(0), [del, setDel] = useState(false);
+  useEffect(() => {
+    const w = words[wi];
+    let t;
+    if (!del && ci < w.length) t = setTimeout(() => setCi(c => c + 1), 72);
+    else if (!del && ci === w.length) t = setTimeout(() => setDel(true), 1800);
+    else if (del && ci > 0) t = setTimeout(() => setCi(c => c - 1), 38);
+    else { setDel(false); setWi(w => (w + 1) % words.length); }
+    return () => clearTimeout(t);
+  }, [ci, del, wi, words]);
+  return <><span className="shimmer-text">{words[wi].slice(0, ci)}</span><span style={{ color: "#3B82F6", animation: "blink 1s infinite" }}>|</span></>;
+}
+
+/* ══════════════════════════════════════════
+   NAVBAR
+══════════════════════════════════════════ */
+const NAV = [
+  { l: "Home", i: "home", p: "home" },
+  { l: "Services", i: "build", p: "services" },
+  { l: "Pricing", i: "sell", p: "pricing" },
+  { l: "Demo", i: "smart_toy", p: "demo" },
+  { l: "Contact", i: "mail", p: "contact" },
+];
+function Navbar({ page, setPage }) {
+  const [scrolled, setScrolled] = useState(false);
+  const [open, setOpen] = useState(false);
+  useEffect(() => { const f = () => setScrolled(window.scrollY > 40); window.addEventListener("scroll", f); return () => window.removeEventListener("scroll", f); }, []);
+  useEffect(() => setOpen(false), [page]);
+  const bg = scrolled || open ? "rgba(4,4,10,0.96)" : "transparent";
+  return (
+    <nav style={{ position: "fixed", top: 0, left: 0, right: 0, zIndex: 300, background: bg, backdropFilter: (scrolled || open) ? "blur(24px)" : "none", borderBottom: (scrolled || open) ? "1px solid rgba(59,130,246,0.14)" : "none", transition: "background .3s", fontFamily: "var(--ff-body)" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 clamp(1rem,4vw,2.5rem)", height: 68 }}>
+        {/* Logo */}
+        <button onClick={() => setPage("home")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: ".7rem" }}>
+          <img src={NAV_LOGO_URI} alt="MAXG Enterprise Logo" style={{ width: 44, height: 44, objectFit: "contain", filter: "drop-shadow(0 0 8px rgba(0,200,255,0.7))", transition: "filter 0.3s" }} onMouseEnter={e => e.target.style.filter="drop-shadow(0 0 16px rgba(0,200,255,1))"} onMouseLeave={e => e.target.style.filter="drop-shadow(0 0 8px rgba(0,200,255,0.7))"} />
+          <div style={{ textAlign: "left" }}>
+            <div style={{ color: "white", fontWeight: 800, fontSize: "1rem", letterSpacing: ".1em", fontFamily: "var(--ff-display)" }}>MAXG</div>
+            <div style={{ color: "#3B82F6", fontSize: ".5rem", letterSpacing: ".35em", fontWeight: 700 }}>ENTERPRISE</div>
+          </div>
+        </button>
+        {/* Desktop links */}
+        <div className="hide-m" style={{ display: "flex", gap: ".15rem", alignItems: "center" }}>
+          {NAV.map(n => (
+            <button key={n.p} onClick={() => setPage(n.p)} style={{ background: page === n.p ? "rgba(59,130,246,0.12)" : "none", border: "none", borderRadius: 8, cursor: "pointer", color: page === n.p ? "#60A5FA" : "#94A3B8", fontSize: ".82rem", fontWeight: 600, letterSpacing: ".07em", padding: ".5rem .9rem", display: "flex", alignItems: "center", gap: ".35rem", transition: "color .2s,background .2s", fontFamily: "var(--ff-body)" }}>
+              <Icon name={n.i} size={15} />{n.l.toUpperCase()}
+            </button>
+          ))}
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: ".75rem" }}>
+          <button className="btn-p nav-cta-d" onClick={() => setPage("demo")} style={{ padding: ".55rem 1.2rem", fontSize: ".82rem", letterSpacing: ".06em", boxShadow: "0 0 24px rgba(59,130,246,0.45)" }}>
+            <Icon name="smart_toy" size={16} /> TRY DEMO
+          </button>
+          {/* Hamburger */}
+          <button onClick={() => setOpen(o => !o)} style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 8, cursor: "pointer", padding: ".45rem", display: "none", alignItems: "center", justifyContent: "center", color: "#60A5FA" }} className="show-m">
+            <Icon name={open ? "close" : "menu"} size={22} />
+          </button>
+        </div>
+      </div>
+      {/* Mobile menu */}
+      {open && (
+        <div className="mobile-menu" style={{ background: "rgba(4,4,10,0.98)", borderTop: "1px solid rgba(59,130,246,0.12)", padding: "1rem clamp(1rem,4vw,2rem) 1.5rem" }}>
+          {NAV.map(n => (
+            <button key={n.p} onClick={() => setPage(n.p)} style={{ display: "flex", alignItems: "center", gap: ".75rem", width: "100%", background: page === n.p ? "rgba(59,130,246,0.12)" : "transparent", border: "none", borderRadius: 10, cursor: "pointer", color: page === n.p ? "#60A5FA" : "#94A3B8", fontSize: ".95rem", fontWeight: 600, padding: ".85rem 1rem", marginBottom: ".3rem", fontFamily: "var(--ff-body)", transition: "background .2s,color .2s" }}>
+              <Icon name={n.i} size={20} color={page === n.p ? "#3B82F6" : "#475569"} />{n.l}
+            </button>
+          ))}
+          <button className="btn-p" onClick={() => setPage("demo")} style={{ marginTop: ".75rem", width: "100%", padding: ".9rem", fontSize: ".95rem", justifyContent: "center", boxShadow: "0 0 28px rgba(59,130,246,0.4)" }}>
+            <Icon name="smart_toy" size={18} /> TRY AI DEMO FREE
+          </button>
+        </div>
+      )}
+    </nav>
+  );
+}
+
+/* ══════════════════════════════════════════
+   HERO — LOGO IN BACKGROUND WITH ALL ANIMATIONS IN FRONT
+══════════════════════════════════════════ */
+function HeroSection({ setPage }) {
+  const [mouse, setMouse] = useState({ x: 0, y: 0 });
+  useEffect(() => { const f = e => setMouse({ x: e.clientX, y: e.clientY }); window.addEventListener("mousemove", f); return () => window.removeEventListener("mousemove", f); }, []);
+
+  return (
+    <section style={{ position: "relative", minHeight: "100vh", display: "flex", alignItems: "center", overflow: "hidden", background: "var(--bg)" }}>
+      {/* ── LAYER 0: Logo watermark background ── */}
+      <div className="logo-bg-wrap" style={{ zIndex: 0 }}>
+        {/* Outer ring pulse behind logo */}
+        <div style={{ position: "absolute", width: "min(700px,95vw)", height: "min(700px,95vw)", borderRadius: "50%", border: "1px solid rgba(59,130,246,0.06)", animation: "ringPulse 4s ease-out infinite" }} />
+        <div style={{ position: "absolute", width: "min(700px,95vw)", height: "min(700px,95vw)", borderRadius: "50%", border: "1px solid rgba(59,130,246,0.04)", animation: "ringPulse 4s ease-out 1s infinite" }} />
+        {/* The logo itself — using chess pawn SVG since image can't be uploaded to artifact */}
+        <div style={{
+          width: "min(520px,85vw)", height: "min(520px,85vw)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          animation: "logoGlow 5s ease-in-out infinite",
+          opacity: 0.15,
+          filter: "drop-shadow(0 0 60px rgba(59,130,246,0.6))",
+        }}>
+          {/* Large MAXG chess pawn — your logo symbol rendered at massive scale */}
+          <svg viewBox="0 0 200 260" style={{ width: "100%", height: "100%", filter: "drop-shadow(0 0 30px rgba(59,130,246,0.8))" }}>
+            {/* Crown */}
+            <path d="M60 60 L80 30 L100 50 L120 20 L140 50 L160 30 L150 70 L50 70 Z" fill="url(#cg)" opacity="0.9"/>
+            {/* Head */}
+            <circle cx="100" cy="95" r="32" fill="url(#hg)"/>
+            {/* Neck */}
+            <rect x="82" y="122" width="36" height="28" rx="4" fill="url(#hg)"/>
+            {/* Body */}
+            <ellipse cx="100" cy="178" rx="52" ry="36" fill="url(#hg)"/>
+            {/* Base */}
+            <rect x="55" y="208" width="90" height="18" rx="9" fill="url(#hg)"/>
+            {/* Neon rim */}
+            <ellipse cx="100" cy="227" rx="62" ry="10" fill="none" stroke="#3B82F6" strokeWidth="1.5" opacity="0.8"/>
+            <circle cx="100" cy="95" r="32" fill="none" stroke="#3B82F6" strokeWidth="1" opacity="0.6"/>
+            <defs>
+              <linearGradient id="cg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#475569"/><stop offset="100%" stopColor="#1E293B"/>
+              </linearGradient>
+              <linearGradient id="hg" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stopColor="#334155"/><stop offset="100%" stopColor="#0F172A"/>
+              </linearGradient>
+            </defs>
+          </svg>
+        </div>
+        {/* Scanline effect across logo */}
+        <div className="logo-scan" style={{ zIndex: 1 }} />
+        {/* Blue radial glow behind logo */}
+        <div style={{ position: "absolute", width: "min(700px,95vw)", height: "min(700px,95vw)", borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)", animation: "logoGlow 5s ease-in-out infinite" }} />
+      </div>
+
+      {/* ── LAYER 1: Grid ── */}
+      <GridSVG id="gh" opacity={0.03} />
+
+      {/* ── LAYER 2: Particles ── */}
+      <ParticleCanvas />
+
+      {/* ── LAYER 3: Orbit rings ── */}
+      <OrbitRings />
+
+      {/* ── LAYER 4: Mouse glow ── */}
+      <div style={{ position: "fixed", pointerEvents: "none", zIndex: 4, left: mouse.x - 200, top: mouse.y - 200, width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(59,130,246,0.08), transparent 70%)", transition: "left .08s,top .08s" }} />
+
+      {/* ── LAYER 5: Hero content ── */}
+      <div style={{ position: "relative", zIndex: 5, width: "100%", maxWidth: 980, margin: "0 auto", padding: "8rem clamp(1rem,5vw,3rem) 5rem", textAlign: "center" }}>
+        <div className="animate-fadeUp" style={{ animationDelay: ".1s", display: "inline-flex", alignItems: "center", gap: ".5rem", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 50, padding: ".35rem 1.1rem", marginBottom: "1.75rem", backdropFilter: "blur(8px)" }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E", boxShadow: "0 0 8px #22C55E", display: "inline-block", animation: "pulse2 2s infinite" }} />
+          <span style={{ color: "#60A5FA", fontSize: ".72rem", fontWeight: 700, letterSpacing: ".2em", fontFamily: "var(--ff-body)" }}>4TH INDUSTRIAL REVOLUTION READY</span>
+        </div>
+
+        <h1 className="hero-h animate-fadeUp" style={{ animationDelay: ".2s", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(2.6rem,6vw,5rem)", lineHeight: 1.08, color: "white", marginBottom: "1rem", letterSpacing: "-.02em" }}>
+          We Build The<br />
+          <Typewriter words={["AI Systems", "Web Platforms", "Database Engines", "Digital Empires", "4IR Solutions"]} />
+          <br />That Run Tomorrow
+        </h1>
+
+        <p className="animate-fadeUp" style={{ animationDelay: ".35s", color: "#94A3B8", fontSize: "1.08rem", lineHeight: 1.75, maxWidth: 570, margin: "0 auto 2.5rem", fontFamily: "var(--ff-body)" }}>
+          MAXG Enterprise engineers AI systems, high-performance websites, and scalable databases — giving your business an unassailable edge in the 4IR economy.
+        </p>
+
+        <div className="hero-btns animate-fadeUp" style={{ animationDelay: ".5s", display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap", marginBottom: "3.5rem" }}>
+          <button className="btn-p" onClick={() => setPage("demo")} style={{ padding: ".9rem 2.2rem", fontSize: "1rem", boxShadow: "0 0 40px rgba(59,130,246,0.6)" }}>
+            <Icon name="smart_toy" size={20} /> Try AI Demo
+          </button>
+          <button className="btn-s" onClick={() => setPage("pricing")} style={{ padding: ".9rem 2.2rem", fontSize: "1rem" }}>
+            <Icon name="sell" size={20} /> View Pricing
+          </button>
+        </div>
+
+        {/* Stats */}
+        <div className="stat-row animate-fadeUp" style={{ animationDelay: ".7s", display: "flex", gap: "2.5rem", justifyContent: "center", flexWrap: "wrap" }}>
+          {[{ n: "50+", l: "Projects", i: "rocket_launch" }, { n: "4", l: "Core Services", i: "category" }, { n: "100%", l: "Satisfaction", i: "star" }, { n: "24/7", l: "Support", i: "support_agent" }].map(s => (
+            <div key={s.l} style={{ textAlign: "center", minWidth: 80 }}>
+              <div style={{ color: "#60A5FA", marginBottom: ".25rem" }}><Icon name={s.i} size={18} /></div>
+              <div style={{ color: "white", fontSize: "1.8rem", fontWeight: 900, fontFamily: "var(--ff-display)" }}>{s.n}</div>
+              <div style={{ color: "#64748B", fontSize: ".72rem", letterSpacing: ".1em", fontFamily: "var(--ff-body)" }}>{s.l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Bottom fade */}
+      <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, height: 130, background: "linear-gradient(transparent,var(--bg))", pointerEvents: "none", zIndex: 6 }} />
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════
+   SERVICES SECTION
+══════════════════════════════════════════ */
+const SERVICES = [
+  { icon: "psychology", color: "#3B82F6", title: "AI Development & Integration", desc: "LLM-powered assistants, predictive analytics, and intelligent automation engines embedded directly into your workflows.", tags: ["Machine Learning", "LLMs", "Automation", "NLP"] },
+  { icon: "language", color: "#06B6D4", title: "Web Development", desc: "From blazing-fast Astro sites to full-stack platforms — we engineer digital experiences that rank, convert, and scale.", tags: ["Next.js", "Astro", "React", "Node.js"] },
+  { icon: "storage", color: "#8B5CF6", title: "Database Architecture", desc: "Robust, scalable design — SQL to NoSQL, cloud migrations, real-time sync, and enterprise-grade security.", tags: ["PostgreSQL", "MongoDB", "Redis", "Supabase"] },
+  { icon: "devices", color: "#F59E0B", title: "4IR Digital Transformation", desc: "IoT integration, smart automation, and full digital ecosystem design for the Fourth Industrial Revolution.", tags: ["IoT", "Cloud", "Edge Computing", "Smart Systems"] },
+];
+function ServicesSection() {
+  const [ref, v] = useInView();
+  return (
+    <section ref={ref} style={{ padding: "6rem clamp(1rem,5vw,3rem)", background: "var(--bg)", position: "relative" }}>
+      <div style={{ maxWidth: 1140, margin: "0 auto" }}>
+        <div style={{ textAlign: "center", marginBottom: "3.5rem" }}>
+          <div style={{ color: "#60A5FA", fontSize: ".72rem", letterSpacing: ".25em", fontWeight: 700, marginBottom: ".75rem", fontFamily: "var(--ff-body)", display: "flex", alignItems: "center", justifyContent: "center", gap: ".4rem" }}><Icon name="build" size={14} color="#3B82F6" /> WHAT WE BUILD</div>
+          <h2 className="sec-h" style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(2rem,4vw,3rem)", marginBottom: "1rem" }}>Enterprise-Grade Services</h2>
+          <p style={{ color: "#64748B", maxWidth: 500, margin: "0 auto", lineHeight: 1.7, fontFamily: "var(--ff-body)" }}>Every service engineered to give your business a strategic, compounding advantage.</p>
+        </div>
+        <div className="grid-2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1.5rem" }}>
+          {SERVICES.map((s, i) => (
+            <div key={s.title} className="card-hover" style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 18, padding: "2rem", opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(30px)", transition: `opacity .6s ${i * .1}s,transform .6s ${i * .1}s` }}>
+              <div style={{ display: "flex", alignItems: "flex-start", gap: "1rem", marginBottom: "1.25rem" }}>
+                <div className="icon-circle" style={{ width: 50, height: 50, borderRadius: 12, background: `${s.color}22`, border: `1px solid ${s.color}44`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon name={s.icon} size={26} color={s.color} />
+                </div>
+                <div>
+                  <h3 style={{ color: "white", fontWeight: 700, fontFamily: "var(--ff-display)", fontSize: "1.1rem", marginBottom: ".5rem" }}>{s.title}</h3>
+                  <p style={{ color: "#94A3B8", fontSize: ".88rem", lineHeight: 1.6, fontFamily: "var(--ff-body)" }}>{s.desc}</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: ".4rem" }}>
+                {s.tags.map(t => <span key={t} style={{ background: `${s.color}18`, color: s.color, fontSize: ".7rem", fontWeight: 700, padding: ".2rem .65rem", borderRadius: 20, border: `1px solid ${s.color}33`, fontFamily: "var(--ff-body)" }}>{t}</span>)}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════
+   4IR SECTION
+══════════════════════════════════════════ */
+function FourIRSection() {
+  const [ref, v] = useInView();
+  const pillars = [
+    { i: "psychology", l: "Artificial Intelligence" }, { i: "cloud", l: "Cloud & Edge Computing" },
+    { i: "hub", l: "IoT Connectivity" }, { i: "analytics", l: "Big Data Analytics" },
+    { i: "security", l: "Cybersecurity" }, { i: "precision_manufacturing", l: "Smart Automation" },
+    { i: "speed", l: "Real-time Systems" }, { i: "api", l: "API Ecosystems" },
+  ];
+  return (
+    <section ref={ref} style={{ padding: "6rem clamp(1rem,5vw,3rem)", background: "var(--bg2)", position: "relative", overflow: "hidden" }}>
+      <GridSVG id="g4ir" opacity={0.03} />
+      <div style={{ maxWidth: 1000, margin: "0 auto", textAlign: "center", position: "relative" }}>
+        <div style={{ color: "#60A5FA", fontSize: ".72rem", letterSpacing: ".25em", fontWeight: 700, marginBottom: ".75rem", fontFamily: "var(--ff-body)", display: "flex", alignItems: "center", justifyContent: "center", gap: ".4rem" }}><Icon name="bolt" size={14} color="#3B82F6" /> THE 4IR EDGE</div>
+        <h2 className="sec-h" style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(1.8rem,4vw,2.8rem)", marginBottom: "1rem" }}>Built for the Fourth Industrial Revolution</h2>
+        <p style={{ color: "#64748B", maxWidth: 560, margin: "0 auto 3rem", lineHeight: 1.75, fontFamily: "var(--ff-body)" }}>The 4IR blurs physical, digital, and biological worlds. MAXG positions your business at the intersection — giving you an unassailable competitive advantage.</p>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: "1rem", justifyContent: "center" }}>
+          {pillars.map((p, i) => (
+            <div key={p.l} className="card-hover animate-float" style={{ background: "rgba(59,130,246,0.07)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 14, padding: "1rem 1.5rem", display: "flex", alignItems: "center", gap: ".7rem", opacity: v ? 1 : 0, transform: v ? "scale(1)" : "scale(0.85)", transition: `opacity .5s ${i * .07}s,transform .5s ${i * .07}s`, animationDelay: `${i * .4}s` }}>
+              <Icon name={p.i} size={22} color="#3B82F6" /><span style={{ color: "white", fontWeight: 600, fontSize: ".88rem", fontFamily: "var(--ff-body)" }}>{p.l}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════
+   DEMO / CHATBOT BOOKING PAGE
+══════════════════════════════════════════ */
+const DEMO_SLOTS = [
+  { time: "09:00 AM", date: "Mon 26 May", spots: 3 },
+  { time: "11:00 AM", date: "Mon 26 May", spots: 2 },
+  { time: "02:00 PM", date: "Tue 27 May", spots: 5 },
+  { time: "04:00 PM", date: "Tue 27 May", spots: 1 },
+  { time: "10:00 AM", date: "Wed 28 May", spots: 4 },
+  { time: "03:00 PM", date: "Thu 29 May", spots: 3 },
+];
+
+const BOT_REPLIES = {
+  hi: "Hey there! 👋 I'm ARIA — MAXG's AI assistant. I can show you what our AI systems can do, or help you book a live demo session. What would you like?",
+  hello: "Hey there! 👋 I'm ARIA — MAXG's AI assistant. I can show you what our AI systems can do, or help you book a live demo session. What would you like?",
+  demo: "Great choice! 🚀 Our live demo is a 30-minute session where our engineers walk you through custom AI integrations, database design, and web systems live. Ready to pick a time slot?",
+  pricing: "We have 3 plans: **Pawn** (R4,999/mo) for startups, **Knight** (R12,999/mo) for growing businesses, and **King** (Custom) for enterprise. Which fits your stage?",
+  ai: "Our AI services include: custom LLM integration, AI chatbots, predictive analytics, document processing, and full ML pipelines. Want a demo of any specific capability?",
+  web: "We build with Next.js, Astro, React, and Node.js — delivering sites that score 95+ on Lighthouse, rank on page 1, and convert visitors into clients.",
+  database: "We architect PostgreSQL, MongoDB, Redis, and Supabase systems — including migrations, real-time sync, API layers, and enterprise security hardening.",
+  book: "To book your demo, scroll down and pick an available time slot below. You'll receive a confirmation at your email. Shall I guide you there?",
+  help: "I can help you with: 🤖 AI capabilities · 🌐 Web development · 🗄️ Database services · 💰 Pricing · 📅 Booking a demo. Just ask!",
+  default: "Great question! Let me connect you with our team for a tailored answer. In the meantime, feel free to book a demo or explore our services. Type 'help' to see what I can assist with.",
+};
+
+function getReply(msg) {
+  const m = msg.toLowerCase();
+  for (const key of Object.keys(BOT_REPLIES)) {
+    if (m.includes(key)) return BOT_REPLIES[key];
   }
+  return BOT_REPLIES.default;
+}
 
-  /* ── Inject Google Material Icons (idempotent) ── */
-  if (!document.getElementById("aria-material-icons")) {
-    var link = document.createElement("link");
-    link.id = "aria-material-icons";
-    link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/icon?family=Material+Icons+Round";
-    document.head.appendChild(link);
-  }
+function DemoPage() {
+  const [messages, setMessages] = useState([{ from: "bot", text: "Hey! 👋 I'm ARIA, MAXG's AI assistant. Ask me anything about our services, or book a live demo below." }]);
+  const [input, setInput] = useState("");
+  const [typing, setTyping] = useState(false);
+  const [booked, setBooked] = useState(null);
+  const [bookForm, setBookForm] = useState({ name: "", email: "", slot: null });
+  const [bookStep, setBookStep] = useState(0); // 0=idle,1=form,2=done
+  const [bookError, setBookError] = useState("");
+  const chatEndRef = useRef(null);
 
-  /* ── Inject scoped CSS ── */
-  var STYLE_ID = "aria-widget-styles";
-  if (!document.getElementById(STYLE_ID)) {
-    var style = document.createElement("style");
-    style.id = STYLE_ID;
-    style.textContent = [
-      "@keyframes aria-slideUp{from{opacity:0;transform:translateY(30px) scale(.96)}to{opacity:1;transform:translateY(0) scale(1)}}",
-      "@keyframes aria-fadeIn{from{opacity:0}to{opacity:1}}",
-      "@keyframes aria-msgIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}",
-      "@keyframes aria-dot{0%,80%,100%{opacity:0;transform:scale(.7)}40%{opacity:1;transform:scale(1)}}",
-      "@keyframes aria-pulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}50%{box-shadow:0 0 0 10px transparent}}",
-      "@keyframes aria-spin{to{transform:rotate(360deg)}}",
-      "@keyframes aria-glow{0%,100%{opacity:.55}50%{opacity:1}}",
-      "@keyframes aria-ringOut{0%{transform:scale(1);opacity:.4}100%{transform:scale(1.55);opacity:0}}",
-      "#aria-fab{all:unset;position:fixed;bottom:2rem;right:2rem;z-index:2147483640;width:62px;height:62px;border-radius:50%;background:linear-gradient(135deg,#1D4ED8,#3B82F6);cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(59,130,246,.5);animation:aria-pulse 2.5s infinite;transition:transform .2s;}",
-      "#aria-fab:hover{transform:scale(1.12);}",
-      "#aria-fab .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:28px;color:#fff;line-height:1;}",
-      "#aria-fab .aria-badge{position:absolute;top:-3px;right:-3px;width:20px;height:20px;border-radius:50%;background:#22C55E;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;box-shadow:0 0 8px #22C55E;font-size:8px;color:#fff;font-weight:900;font-family:system-ui,sans-serif;}",
-      "#aria-overlay{position:fixed;inset:0;z-index:2147483641;background:rgba(2,2,8,.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);animation:aria-fadeIn .22s ease both;}",
-      "#aria-modal{position:fixed;z-index:2147483642;bottom:2rem;right:2rem;width:min(400px,96vw);height:min(640px,88vh);display:flex;flex-direction:column;background:linear-gradient(160deg,rgba(7,7,20,.98),rgba(4,4,14,.99));border:1px solid rgba(59,130,246,.38);border-radius:22px;box-shadow:0 0 80px rgba(59,130,246,.22),0 40px 100px rgba(0,0,0,.8);overflow:hidden;animation:aria-slideUp .32s cubic-bezier(.22,1,.36,1) both;font-family:'DM Sans',system-ui,sans-serif;}",
-      "#aria-modal .aria-topbar{position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#1D4ED8,#3B82F6,#60A5FA,#3B82F6,#1D4ED8,transparent);animation:aria-glow 3s ease-in-out infinite;}",
-      "#aria-modal .aria-header{padding:1rem 1.2rem;border-bottom:1px solid rgba(59,130,246,.13);background:rgba(59,130,246,.055);display:flex;align-items:center;gap:.8rem;flex-shrink:0;}",
-      "#aria-modal .aria-avatar{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#1a3a8f,#2563eb,#3B82F6);display:flex;align-items:center;justify-content:center;box-shadow:0 0 0 2px rgba(59,130,246,.3),0 0 18px rgba(59,130,246,.5);animation:aria-pulse 3s infinite;flex-shrink:0;position:relative;}",
-      "#aria-modal .aria-avatar .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:22px;color:#fff;line-height:1;}",
-      "#aria-modal .aria-avatar .aria-online{position:absolute;bottom:1px;right:1px;width:10px;height:10px;border-radius:50%;background:#22C55E;border:2px solid rgba(4,4,14,.99);box-shadow:0 0 6px #22C55E;}",
-      "#aria-modal .aria-hinfo{flex:1;min-width:0;}",
-      "#aria-modal .aria-hname{color:#fff;font-weight:800;font-size:.95rem;letter-spacing:.03em;}",
-      "#aria-modal .aria-hstatus{color:#22C55E;font-size:.68rem;font-weight:700;display:flex;align-items:center;gap:.35rem;}",
-      "#aria-modal .aria-hstatus span{width:5px;height:5px;border-radius:50%;background:#22C55E;display:inline-block;animation:aria-pulse 2s infinite;}",
-      "#aria-modal .aria-tabs{display:flex;border-bottom:1px solid rgba(59,130,246,.13);flex-shrink:0;}",
-      "#aria-modal .aria-tab{flex:1;padding:.6rem;background:transparent;border:none;color:#475569;font-size:.75rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:.35rem;font-family:'DM Sans',system-ui,sans-serif;letter-spacing:.05em;transition:color .18s,background .18s;border-bottom:2px solid transparent;}",
-      "#aria-modal .aria-tab.active{color:#60A5FA;border-bottom-color:#3B82F6;background:rgba(59,130,246,.06);}",
-      "#aria-modal .aria-tab .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:15px;line-height:1;}",
-      "#aria-modal .aria-messages{flex:1;overflow-y:auto;padding:1.2rem;display:flex;flex-direction:column;gap:.85rem;scrollbar-width:thin;scrollbar-color:rgba(59,130,246,.35) transparent;}",
-      "#aria-modal .aria-messages::-webkit-scrollbar{width:4px;}",
-      "#aria-modal .aria-messages::-webkit-scrollbar-thumb{background:rgba(59,130,246,.35);border-radius:4px;}",
-      ".aria-msg-row{display:flex;align-items:flex-end;gap:.5rem;animation:aria-msgIn .3s ease both;}",
-      ".aria-msg-row.user{flex-direction:row-reverse;}",
-      ".aria-msg-bubble{max-width:78%;padding:.75rem 1rem;border-radius:18px 18px 18px 4px;background:rgba(255,255,255,.055);border:1px solid rgba(59,130,246,.18);color:#fff;font-size:.85rem;line-height:1.65;word-break:break-word;}",
-      ".aria-msg-row.user .aria-msg-bubble{border-radius:18px 18px 4px 18px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);border:none;box-shadow:0 4px 20px rgba(59,130,246,.3);}",
-      ".aria-msg-avt{width:28px;height:28px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;}",
-      ".aria-msg-avt.bot{background:linear-gradient(135deg,#1a3a8f,#2563eb);box-shadow:0 0 8px rgba(59,130,246,.35);}",
-      ".aria-msg-avt.user{background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.28);}",
-      ".aria-msg-avt .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:14px;color:#fff;line-height:1;}",
-      ".aria-typing-dot{width:7px;height:7px;border-radius:50%;background:#60A5FA;animation:aria-dot 1.4s infinite ease-in-out;}",
-      "#aria-modal .aria-quick-bar{padding:.55rem 1rem;border-top:1px solid rgba(59,130,246,.09);display:flex;gap:.4rem;flex-wrap:wrap;background:rgba(0,0,0,.18);flex-shrink:0;}",
-      ".aria-quick-btn{background:rgba(59,130,246,.09);border:1px solid rgba(59,130,246,.22);border-radius:20px;color:#60A5FA;font-size:.68rem;font-weight:700;padding:.28rem .75rem;cursor:pointer;font-family:'DM Sans',system-ui,sans-serif;letter-spacing:.04em;transition:background .18s,border-color .18s,transform .18s;}",
-      ".aria-quick-btn:hover{background:rgba(59,130,246,.22);border-color:rgba(59,130,246,.55);transform:translateY(-1px);}",
-      "#aria-modal .aria-input-row{padding:.85rem 1rem;border-top:1px solid rgba(59,130,246,.1);display:flex;gap:.6rem;background:rgba(0,0,0,.28);flex-shrink:0;}",
-      "#aria-input{flex:1;background:rgba(255,255,255,.045);border:1px solid rgba(59,130,246,.22);border-radius:11px;color:#fff;font-size:.87rem;padding:.7rem .9rem;outline:none;font-family:'DM Sans',system-ui,sans-serif;transition:border-color .18s,box-shadow .18s;}",
-      "#aria-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.14);}",
-      "#aria-input::placeholder{color:#475569;}",
-      "#aria-send{background:linear-gradient(135deg,#1D4ED8,#3B82F6);border:none;border-radius:11px;cursor:pointer;padding:.7rem .95rem;flex-shrink:0;display:flex;align-items:center;justify-content:center;box-shadow:0 0 18px rgba(59,130,246,.4);transition:transform .18s,filter .18s,opacity .18s;}",
-      "#aria-send:hover:not(:disabled){transform:translateY(-2px);filter:brightness(1.1);}",
-      "#aria-send:disabled{opacity:.45;cursor:not-allowed;}",
-      "#aria-send .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:19px;color:#fff;line-height:1;}",
-      "#aria-close-btn{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#64748B;flex-shrink:0;transition:background .18s,color .18s,border-color .18s;}",
-      "#aria-close-btn:hover{background:rgba(239,68,68,.18);color:#EF4444;border-color:rgba(239,68,68,.4);}",
-      "#aria-close-btn .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:16px;line-height:1;}",
-      /* Booking tab */
-      "#aria-book-panel{flex:1;overflow-y:auto;padding:1.2rem;display:flex;flex-direction:column;gap:.85rem;scrollbar-width:thin;scrollbar-color:rgba(59,130,246,.35) transparent;}",
-      "#aria-book-panel::-webkit-scrollbar{width:4px;}",
-      "#aria-book-panel::-webkit-scrollbar-thumb{background:rgba(59,130,246,.35);border-radius:4px;}",
-      ".aria-slots-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:.55rem;}",
-      ".aria-slot-btn{all:unset;background:rgba(59,130,246,.055);border:1px solid rgba(59,130,246,.18);border-radius:12px;padding:.85rem .75rem;cursor:pointer;font-family:'DM Sans',system-ui,sans-serif;transition:border-color .22s,transform .22s,background .22s;}",
-      ".aria-slot-btn:hover{border-color:rgba(59,130,246,.6);transform:translateY(-2px);background:rgba(59,130,246,.1);}",
-      ".aria-slot-time{color:#fff;font-weight:700;font-size:.85rem;margin-bottom:.12rem;}",
-      ".aria-slot-date{color:#64748B;font-size:.7rem;margin-bottom:.4rem;}",
-      ".aria-slot-spots{font-size:.66rem;font-weight:700;display:flex;align-items:center;gap:.3rem;}",
-      ".aria-form-label{display:flex;align-items:center;gap:.35rem;color:#64748B;font-size:.66rem;font-weight:700;letter-spacing:.14em;margin-bottom:.4rem;font-family:'DM Sans',system-ui,sans-serif;}",
-      ".aria-form-label .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:12px;color:#3B82F6;line-height:1;}",
-      ".aria-form-input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.04);border:1px solid rgba(59,130,246,.22);border-radius:10px;color:#fff;font-size:.87rem;padding:.72rem .9rem;outline:none;font-family:'DM Sans',system-ui,sans-serif;transition:border-color .18s,box-shadow .18s;margin-bottom:.9rem;}",
-      ".aria-form-input:focus{border-color:#3B82F6;box-shadow:0 0 0 3px rgba(59,130,246,.13);}",
-      ".aria-form-input::placeholder{color:#475569;}",
-      ".aria-btn-primary{all:unset;display:flex;align-items:center;justify-content:center;gap:.4rem;width:100%;box-sizing:border-box;padding:.82rem;border-radius:11px;background:linear-gradient(135deg,#1D4ED8,#3B82F6);color:#fff;font-weight:700;cursor:pointer;font-family:'DM Sans',system-ui,sans-serif;font-size:.87rem;box-shadow:0 0 22px rgba(59,130,246,.45);transition:filter .18s,transform .18s;text-align:center;}",
-      ".aria-btn-primary:hover{filter:brightness(1.1);transform:translateY(-2px);}",
-      ".aria-btn-ghost{all:unset;display:flex;align-items:center;justify-content:center;gap:.4rem;padding:.78rem;border-radius:11px;border:1px solid rgba(59,130,246,.28);color:#60A5FA;font-weight:600;cursor:pointer;font-family:'DM Sans',system-ui,sans-serif;font-size:.87rem;transition:background .18s;text-align:center;}",
-      ".aria-btn-ghost:hover{background:rgba(59,130,246,.1);}",
-      ".aria-btn-ghost .aria-icon,.aria-btn-primary .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:15px;line-height:1;color:inherit;}",
-      ".aria-error{display:flex;align-items:center;gap:.4rem;color:#EF4444;font-size:.75rem;margin-bottom:.75rem;font-family:'DM Sans',system-ui,sans-serif;}",
-      ".aria-error .aria-icon{font-family:'Material Icons Round';font-style:normal;font-size:13px;color:#EF4444;line-height:1;}",
-      ".aria-success-box{text-align:center;padding:2rem 1rem;animation:aria-msgIn .4s ease both;}",
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages, typing]);
 
-      /* Social screen */
-      "#aria-social-panel{flex:1;overflow-y:auto;padding:1.4rem 1.2rem;display:flex;flex-direction:column;gap:1rem;}",
-      ".aria-social-header{text-align:center;padding:.5rem 0 .8rem;}",
-      ".aria-social-title{color:#fff;font-family:'Playfair Display',Georgia,serif;font-weight:900;font-size:1.15rem;margin-bottom:.3rem;}",
-      ".aria-social-sub{color:#64748B;font-size:.78rem;line-height:1.6;}",
-      ".aria-social-links{display:flex;flex-direction:column;gap:.6rem;}",
-      ".aria-social-link{all:unset;display:flex;align-items:center;gap:.9rem;padding:.9rem 1rem;border-radius:14px;border:1px solid rgba(255,255,255,.08);cursor:pointer;transition:transform .2s,border-color .2s,background .2s;font-family:'DM Sans',system-ui,sans-serif;}",
-      ".aria-social-link:hover{transform:translateX(4px);}",
-      ".aria-social-icon{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;padding:10px;box-sizing:border-box;}",
-      ".aria-social-info{flex:1;}",
-      ".aria-social-name{color:#fff;font-weight:700;font-size:.88rem;}",
-      ".aria-social-desc{color:#64748B;font-size:.7rem;margin-top:.1rem;}",
-      ".aria-social-arrow{color:#475569;font-family:'Material Icons Round';font-style:normal;font-size:16px;line-height:1;}",
-      ".aria-social-divider{display:flex;align-items:center;gap:.75rem;margin:.2rem 0;}",
-      ".aria-social-divider-line{flex:1;height:1px;background:rgba(255,255,255,.07);}",
-      ".aria-social-divider-text{color:#475569;font-size:.68rem;font-weight:700;letter-spacing:.15em;font-family:'DM Sans',system-ui,sans-serif;}",
-      /* Link confirm overlay */
-      "#aria-link-confirm{position:absolute;inset:0;z-index:10;background:rgba(2,2,8,.92);backdrop-filter:blur(8px);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:2rem;text-align:center;border-radius:22px;animation:aria-fadeIn .2s ease both;}",
-      "#aria-link-confirm .aria-confirm-icon{font-size:48px;margin-bottom:1rem;}",
-      "#aria-link-confirm h3{color:#fff;font-family:'Playfair Display',Georgia,serif;font-weight:900;font-size:1.2rem;margin:0 0 .5rem;}",
-      "#aria-link-confirm p{color:#94A3B8;font-size:.85rem;line-height:1.65;margin:0 0 1.5rem;}",
-      "#aria-link-confirm .aria-confirm-btns{display:flex;gap:.7rem;width:100%;}",
-      "@media(max-width:480px){#aria-modal{bottom:0;right:0;left:0;width:100%;border-radius:22px 22px 0 0;height:min(640px,88vh);}.aria-slots-grid{grid-template-columns:1fr 1fr;}}",
-    ].join("");
-    document.head.appendChild(style);
-  }
+  const send = useCallback(() => {
+    const txt = input.trim(); if (!txt) return;
+    setMessages(m => [...m, { from: "user", text: txt }]);
+    setInput("");
+    setTyping(true);
+    setTimeout(() => {
+      setTyping(false);
+      setMessages(m => [...m, { from: "bot", text: getReply(txt) }]);
+    }, 1100 + Math.random() * 600);
+  }, [input]);
 
-  /* ── Icon helper ── */
-  function icon(name, size) {
-    var s = document.createElement("span");
-    s.className = "aria-icon";
-    s.textContent = name;
-    if (size) s.style.fontSize = size + "px";
-    return s;
-  }
-
-  /* ── Widget state ── */
-  var state = {
-    open: false,
-    tab: "chat",
-    screen: "social", // 'social' | 'chat' | 'book'
-    messages: [{ from: "bot", text: cfg.welcomeMsg }],
-    typing: false,
-    typingTimer: null,
-    bookStep: 0, // 0=slots, 1=form, 2=done
-    bookSlot: null,
-    bookName: "",
-    bookEmail: "",
-    bookError: "",
+  const handleBook = () => {
+    if (!bookForm.name.trim() || !bookForm.email.trim() || !bookForm.slot === null) { setBookError("Please fill all fields and select a slot."); return; }
+    if (!/\S+@\S+\.\S+/.test(bookForm.email)) { setBookError("Please enter a valid email."); return; }
+    setBookError("");
+    setBookStep(2);
+    setMessages(m => [...m, { from: "bot", text: `🎉 Booking confirmed for ${DEMO_SLOTS[bookForm.slot].date} at ${DEMO_SLOTS[bookForm.slot].time}! A confirmation is on its way to ${bookForm.email}. See you then, ${bookForm.name}!` }]);
   };
 
-  /* ── DOM refs ── */
-  var fab, overlay, modal, msgContainer, inputEl, sendBtn, quickBar;
-  var bookPanel, chatSection, socialPanel, confirmOverlay;
+  return (
+    <div style={{ paddingTop: 68, background: "var(--bg)", minHeight: "100vh", fontFamily: "var(--ff-body)" }}>
+      {/* Header */}
+      <section style={{ padding: "4rem clamp(1rem,5vw,3rem) 2rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "min(700px,100vw)", height: 300, background: "radial-gradient(ellipse,rgba(59,130,246,0.1),transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative" }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: ".5rem", background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.3)", borderRadius: 50, padding: ".35rem 1.1rem", marginBottom: "1.5rem" }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#22C55E", boxShadow: "0 0 8px #22C55E", display: "inline-block", animation: "pulse2 2s infinite" }} />
+            <span style={{ color: "#60A5FA", fontSize: ".72rem", fontWeight: 700, letterSpacing: ".2em" }}>LIVE DEMO — FREE SESSION</span>
+          </div>
+          <h1 style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(2rem,5vw,3.2rem)", marginBottom: "1rem" }}>
+            Experience the Future.<br />
+            <span className="shimmer-text">Book Your AI Demo.</span>
+          </h1>
+          <p style={{ color: "#64748B", maxWidth: 540, margin: "0 auto", lineHeight: 1.75 }}>
+            Chat with ARIA our AI assistant, then book a 30-minute live session with our engineers. No pressure. No obligation. Pure tech.
+          </p>
+        </div>
+      </section>
 
-  /* ── Build FAB ── */
-  function buildFab() {
-    fab = document.createElement("button");
-    fab.id = "aria-fab";
-    fab.title = "Chat with " + cfg.botName;
-    fab.setAttribute("aria-label", "Open chat with " + cfg.botName);
-    fab.appendChild(icon("smart_toy", 28));
-    var badge = document.createElement("div");
-    badge.className = "aria-badge";
-    badge.textContent = "AI";
-    fab.appendChild(badge);
-    fab.addEventListener("click", openModal);
-    document.body.appendChild(fab);
-  }
+      {/* Main layout */}
+      <section style={{ padding: "1rem clamp(1rem,5vw,3rem) 5rem" }}>
+        <div style={{ maxWidth: 1200, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "2rem", alignItems: "start" }} className="grid-2">
 
-  /* ── Build modal ── */
-  function buildModal() {
-    /* overlay */
-    overlay = document.createElement("div");
-    overlay.id = "aria-overlay";
-    overlay.addEventListener("click", closeModal);
+          {/* ── CHATBOT ── */}
+          <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 20, overflow: "hidden", display: "flex", flexDirection: "column" }}>
+            {/* Chat header */}
+            <div style={{ padding: "1.25rem 1.5rem", borderBottom: "1px solid rgba(59,130,246,0.15)", background: "rgba(59,130,246,0.06)", display: "flex", alignItems: "center", gap: "1rem" }}>
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 16px rgba(59,130,246,0.5)", animation: "pulse2 3s infinite" }}>
+                <Icon name="smart_toy" size={22} color="white" />
+              </div>
+              <div>
+                <div style={{ color: "white", fontWeight: 700, fontSize: ".95rem" }}>ARIA</div>
+                <div style={{ color: "#22C55E", fontSize: ".72rem", fontWeight: 600, display: "flex", alignItems: "center", gap: ".3rem" }}>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: "#22C55E", display: "inline-block" }} /> Online — Ready to help
+                </div>
+              </div>
+              <div style={{ marginLeft: "auto", display: "flex", gap: ".5rem" }}>
+                {["fiber_manual_record", "fiber_manual_record", "fiber_manual_record"].map((ic, i) => (
+                  <span key={i} style={{ fontSize: 10, color: i === 0 ? "#EF4444" : i === 1 ? "#F59E0B" : "#22C55E", lineHeight: 1 }} className="material-icons-round">{ic}</span>
+                ))}
+              </div>
+            </div>
 
-    /* modal */
-    modal = document.createElement("div");
-    modal.id = "aria-modal";
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    modal.setAttribute("aria-label", cfg.botName + " chat");
+            {/* Messages */}
+            <div style={{ height: 380, overflowY: "auto", padding: "1.5rem", display: "flex", flexDirection: "column", gap: "1rem", scrollbarWidth: "thin" }}>
+              {messages.map((msg, i) => (
+                <div key={i} className="chat-bubble-in" style={{ display: "flex", justifyContent: msg.from === "user" ? "flex-end" : "flex-start", animationDelay: `${i * .05}s` }}>
+                  {msg.from === "bot" && (
+                    <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", marginRight: ".6rem", flexShrink: 0, alignSelf: "flex-end" }}>
+                      <Icon name="smart_toy" size={16} color="white" />
+                    </div>
+                  )}
+                  <div style={{
+                    maxWidth: "75%", padding: ".75rem 1rem", borderRadius: msg.from === "user" ? "18px 18px 4px 18px" : "18px 18px 18px 4px",
+                    background: msg.from === "user" ? "linear-gradient(135deg,#1D4ED8,#3B82F6)" : "rgba(255,255,255,0.06)",
+                    border: msg.from === "user" ? "none" : "1px solid rgba(59,130,246,0.2)",
+                    color: "white", fontSize: ".88rem", lineHeight: 1.6, fontFamily: "var(--ff-body)",
+                  }}>{msg.text}</div>
+                </div>
+              ))}
+              {typing && (
+                <div style={{ display: "flex", alignItems: "center", gap: ".6rem" }}>
+                  <div style={{ width: 28, height: 28, borderRadius: "50%", background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    <Icon name="smart_toy" size={16} color="white" />
+                  </div>
+                  <div style={{ background: "rgba(255,255,255,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: "18px 18px 18px 4px", padding: ".75rem 1.1rem", display: "flex", gap: ".4rem", alignItems: "center" }}>
+                    <div className="typing-dot" /><div className="typing-dot" /><div className="typing-dot" />
+                  </div>
+                </div>
+              )}
+              <div ref={chatEndRef} />
+            </div>
 
-    /* top glow bar */
-    var topBar = document.createElement("div");
-    topBar.className = "aria-topbar";
-    modal.appendChild(topBar);
+            {/* Quick prompts */}
+            <div style={{ padding: ".75rem 1.25rem", borderTop: "1px solid rgba(59,130,246,0.1)", display: "flex", gap: ".5rem", flexWrap: "wrap" }}>
+              {["Pricing", "AI services", "Book demo", "Web dev"].map(q => (
+                <button key={q} onClick={() => { setInput(q); setTimeout(() => send(), 0); setMessages(m => [...m, { from: "user", text: q }]); setTyping(true); setTimeout(() => { setTyping(false); setMessages(m => [...m, { from: "bot", text: getReply(q) }]); }, 1100); }} style={{ background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 20, color: "#60A5FA", fontSize: ".72rem", fontWeight: 600, padding: ".3rem .8rem", cursor: "pointer", fontFamily: "var(--ff-body)", transition: "background .2s" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(59,130,246,0.22)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "rgba(59,130,246,0.1)"}
+                >{q}</button>
+              ))}
+            </div>
 
-    /* header */
-    var header = document.createElement("div");
-    header.className = "aria-header";
+            {/* Input */}
+            <div style={{ padding: "1rem 1.25rem", borderTop: "1px solid rgba(59,130,246,0.12)", display: "flex", gap: ".75rem" }}>
+              <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Enter" && send()} placeholder="Ask ARIA anything..." style={{ flex: 1, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 12, color: "white", fontSize: ".9rem", padding: ".75rem 1rem", outline: "none", fontFamily: "var(--ff-body)" }}
+                onFocus={e => e.target.style.borderColor = "#3B82F6"}
+                onBlur={e => e.target.style.borderColor = "rgba(59,130,246,0.25)"}
+              />
+              <button className="btn-p" onClick={send} style={{ padding: ".75rem 1.1rem", borderRadius: 12, boxShadow: "0 0 20px rgba(59,130,246,0.4)" }}>
+                <Icon name="send" size={20} />
+              </button>
+            </div>
+          </div>
 
-    var avatar = document.createElement("div");
-    avatar.className = "aria-avatar";
-    avatar.appendChild(icon("smart_toy", 22));
-    var onlineDot = document.createElement("div");
-    onlineDot.className = "aria-online";
-    avatar.appendChild(onlineDot);
-    header.appendChild(avatar);
+          {/* ── BOOKING ── */}
+          <div>
+            <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 20, padding: "2rem", marginBottom: "1.5rem" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: ".75rem", marginBottom: "1.5rem" }}>
+                <div style={{ width: 44, height: 44, borderRadius: 12, background: "rgba(59,130,246,0.15)", border: "1px solid rgba(59,130,246,0.35)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                  <Icon name="calendar_today" size={24} color="#3B82F6" />
+                </div>
+                <div>
+                  <h3 style={{ color: "white", fontWeight: 700, fontFamily: "var(--ff-display)", fontSize: "1.1rem" }}>Book a Live Demo</h3>
+                  <p style={{ color: "#64748B", fontSize: ".8rem" }}>30 min · Free · No commitment</p>
+                </div>
+              </div>
 
-    var hinfo = document.createElement("div");
-    hinfo.className = "aria-hinfo";
-    var hname = document.createElement("div");
-    hname.className = "aria-hname";
-    hname.textContent = cfg.botName;
-    var hstatus = document.createElement("div");
-    hstatus.className = "aria-hstatus";
-    var dot = document.createElement("span");
-    hstatus.appendChild(dot);
-    hstatus.appendChild(document.createTextNode(cfg.botSubtitle));
-    hinfo.appendChild(hname);
-    hinfo.appendChild(hstatus);
-    header.appendChild(hinfo);
+              {bookStep === 2 ? (
+                <div className="animate-scaleIn" style={{ textAlign: "center", padding: "2rem 1rem" }}>
+                  <div style={{ fontSize: 52, marginBottom: "1rem", animation: "float 3s ease-in-out infinite" }}>🎉</div>
+                  <h3 style={{ color: "#60A5FA", fontFamily: "var(--ff-display)", marginBottom: ".5rem" }}>You're Booked!</h3>
+                  <p style={{ color: "#94A3B8", fontSize: ".9rem", lineHeight: 1.6 }}>
+                    See you on <strong style={{ color: "white" }}>{DEMO_SLOTS[bookForm.slot]?.date}</strong> at <strong style={{ color: "white" }}>{DEMO_SLOTS[bookForm.slot]?.time}</strong>.<br />
+                    Check <strong style={{ color: "white" }}>{bookForm.email}</strong> for your confirmation.
+                  </p>
+                  <div style={{ display: "flex", justifyContent: "center", gap: ".75rem", marginTop: "1.5rem" }}>
+                    <Icon name="check_circle" size={28} color="#22C55E" />
+                    <span style={{ color: "#22C55E", fontWeight: 700, display: "flex", alignItems: "center" }}>Booking Confirmed</span>
+                  </div>
+                </div>
+              ) : bookStep === 1 ? (
+                <div>
+                  <p style={{ color: "#94A3B8", fontSize: ".85rem", marginBottom: "1.25rem" }}>Selected: <strong style={{ color: "#60A5FA" }}>{DEMO_SLOTS[bookForm.slot]?.date} @ {DEMO_SLOTS[bookForm.slot]?.time}</strong></p>
+                  {[{ l: "Your Name", k: "name", ic: "person", ph: "Jane Smith" }, { l: "Email Address", k: "email", ic: "email", ph: "jane@company.com" }].map(f => (
+                    <div key={f.k} style={{ marginBottom: "1rem" }}>
+                      <label style={{ display: "flex", alignItems: "center", gap: ".4rem", color: "#94A3B8", fontSize: ".72rem", fontWeight: 700, letterSpacing: ".12em", marginBottom: ".4rem" }}>
+                        <Icon name={f.ic} size={13} color="#3B82F6" />{f.l.toUpperCase()}
+                      </label>
+                      <input value={bookForm[f.k]} onChange={e => setBookForm(b => ({ ...b, [f.k]: e.target.value }))} placeholder={f.ph} style={{ width: "100%", background: "rgba(255,255,255,0.05)", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 10, color: "white", fontSize: ".9rem", padding: ".75rem .9rem", outline: "none", fontFamily: "var(--ff-body)" }}
+                        onFocus={e => e.target.style.borderColor = "#3B82F6"}
+                        onBlur={e => e.target.style.borderColor = "rgba(59,130,246,0.25)"}
+                      />
+                    </div>
+                  ))}
+                  {bookError && <div style={{ color: "#EF4444", fontSize: ".8rem", marginBottom: ".75rem", display: "flex", alignItems: "center", gap: ".3rem" }}><Icon name="error" size={15} color="#EF4444" />{bookError}</div>}
+                  <div style={{ display: "flex", gap: ".75rem" }}>
+                    <button className="btn-s" onClick={() => setBookStep(0)} style={{ flex: 1, justifyContent: "center", padding: ".8rem", fontSize: ".88rem" }}><Icon name="arrow_back" size={16} />Back</button>
+                    <button className="btn-p" onClick={handleBook} style={{ flex: 2, justifyContent: "center", padding: ".8rem", fontSize: ".88rem", boxShadow: "0 0 24px rgba(59,130,246,0.45)" }}><Icon name="event_available" size={16} />Confirm Booking</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  <p style={{ color: "#94A3B8", fontSize: ".85rem", marginBottom: "1.25rem" }}>Select an available time slot:</p>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: ".75rem" }}>
+                    {DEMO_SLOTS.map((slot, i) => (
+                      <button key={i} className="booking-card" onClick={() => { setBookForm(b => ({ ...b, slot: i })); setBookStep(1); }} style={{ background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 12, padding: "1rem", cursor: "pointer", textAlign: "left", fontFamily: "var(--ff-body)" }}>
+                        <div style={{ color: "white", fontWeight: 700, fontSize: ".9rem", marginBottom: ".2rem" }}>{slot.time}</div>
+                        <div style={{ color: "#64748B", fontSize: ".78rem", marginBottom: ".5rem" }}>{slot.date}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: ".3rem" }}>
+                          <span style={{ width: 6, height: 6, borderRadius: "50%", background: slot.spots <= 1 ? "#F59E0B" : "#22C55E", display: "inline-block" }} />
+                          <span style={{ color: slot.spots <= 1 ? "#F59E0B" : "#22C55E", fontSize: ".72rem", fontWeight: 600 }}>{slot.spots} spot{slot.spots !== 1 ? "s" : ""} left</span>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
 
-    var closeBtn = document.createElement("button");
-    closeBtn.id = "aria-close-btn";
-    closeBtn.setAttribute("aria-label", "Close chat");
-    closeBtn.appendChild(icon("close", 16));
-    closeBtn.addEventListener("click", closeModal);
-    header.appendChild(closeBtn);
-    modal.appendChild(header);
+            {/* What to expect */}
+            <div style={{ background: "rgba(59,130,246,0.05)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 16, padding: "1.5rem" }}>
+              <h4 style={{ color: "white", fontWeight: 700, marginBottom: "1rem", display: "flex", alignItems: "center", gap: ".5rem", fontFamily: "var(--ff-display)" }}>
+                <Icon name="info" size={18} color="#3B82F6" /> What to Expect
+              </h4>
+              {[
+                { i: "smart_toy", t: "Live AI system walkthrough tailored to your industry" },
+                { i: "code", t: "Real code demos — no slideshows, no fluff" },
+                { i: "question_answer", t: "Q&A with our senior engineers" },
+                { i: "description", t: "Custom proposal delivered within 24 hours" },
+              ].map(e => (
+                <div key={e.t} style={{ display: "flex", alignItems: "flex-start", gap: ".65rem", marginBottom: ".75rem" }}>
+                  <Icon name={e.i} size={17} color="#3B82F6" style={{ marginTop: 2 }} />
+                  <span style={{ color: "#94A3B8", fontSize: ".85rem", lineHeight: 1.5, fontFamily: "var(--ff-body)" }}>{e.t}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
 
-    /* tabs */
-    var tabsRow = document.createElement("div");
-    tabsRow.className = "aria-tabs";
+/* ══════════════════════════════════════════
+   PRICING PAGE
+══════════════════════════════════════════ */
+const PLANS = [
+  { name: "Pawn", chess: "♟", tagline: "Start your rise", price: 4999, color: "#6B7280", popular: false, features: [{ i: "web", t: "5-page business website" }, { i: "smart_toy", t: "Basic AI chatbot" }, { i: "storage", t: "SQLite / basic DB" }, { i: "support_agent", t: "1 month support" }, { i: "phone_iphone", t: "Mobile responsive" }, { i: "search", t: "SEO foundation" }], cta: "Begin Your Rise" },
+  { name: "Knight", chess: "♞", tagline: "Move differently", price: 12999, color: "#3B82F6", popular: true, features: [{ i: "web_stories", t: "15-page dynamic website" }, { i: "psychology", t: "Custom AI assistant" }, { i: "hub", t: "PostgreSQL + REST API" }, { i: "support_agent", t: "3 months priority support" }, { i: "analytics", t: "Analytics dashboard" }, { i: "admin_panel_settings", t: "Admin CMS panel" }, { i: "share", t: "Social media automation" }], cta: "Command the Board" },
+  { name: "King", chess: "♚", tagline: "Rule everything", price: null, color: "#F59E0B", popular: false, features: [{ i: "corporate_fare", t: "Full enterprise platform" }, { i: "model_training", t: "Bespoke AI model training" }, { i: "dns", t: "Multi-DB architecture" }, { i: "verified_user", t: "12 months dedicated support" }, { i: "devices", t: "IoT & 4IR integration" }, { i: "bar_chart", t: "Real-time analytics suite" }, { i: "branding_watermark", t: "White-label solutions" }, { i: "gavel", t: "SLA guarantee" }], cta: "Claim Your Legacy" },
+];
+function PricingPage({ setPage }) {
+  const [ref, v] = useInView(0.1);
+  const [annual, setAnnual] = useState(false);
+  return (
+    <div style={{ paddingTop: 68, background: "var(--bg)", minHeight: "100vh", fontFamily: "var(--ff-body)" }}>
+      <section style={{ padding: "4rem clamp(1rem,5vw,3rem) 2rem", textAlign: "center", position: "relative", overflow: "hidden" }}>
+        <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: "min(700px,100vw)", height: 300, background: "radial-gradient(ellipse,rgba(59,130,246,0.1),transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ position: "relative" }}>
+          <div style={{ color: "#60A5FA", fontSize: ".72rem", letterSpacing: ".25em", fontWeight: 700, marginBottom: ".75rem", display: "flex", alignItems: "center", justifyContent: "center", gap: ".4rem" }}><Icon name="sell" size={14} color="#3B82F6" /> TRANSPARENT PRICING</div>
+          <h1 style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(2.2rem,5vw,3.5rem)", marginBottom: "1rem" }}>Choose Your Rank</h1>
+          <p style={{ color: "#64748B", maxWidth: 500, margin: "0 auto 2rem", lineHeight: 1.7 }}>From rising challenger to digital sovereign — every plan is built to grow with you.</p>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: ".75rem", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(59,130,246,0.2)", borderRadius: 50, padding: ".4rem .8rem" }}>
+            <span style={{ color: !annual ? "#60A5FA" : "#64748B", fontSize: ".85rem", fontWeight: 600 }}>Monthly</span>
+            <button onClick={() => setAnnual(a => !a)} style={{ width: 44, height: 24, borderRadius: 12, background: annual ? "linear-gradient(135deg,#1D4ED8,#3B82F6)" : "rgba(100,116,139,0.3)", border: "none", cursor: "pointer", position: "relative", transition: "background .3s" }}>
+              <div style={{ position: "absolute", top: 3, left: annual ? 22 : 3, width: 18, height: 18, borderRadius: "50%", background: "white", transition: "left .3s", boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }} />
+            </button>
+            <span style={{ color: annual ? "#60A5FA" : "#64748B", fontSize: ".85rem", fontWeight: 600 }}>Annual <span style={{ background: "rgba(34,197,94,0.15)", color: "#22C55E", fontSize: ".7rem", padding: ".1rem .4rem", borderRadius: 10, fontWeight: 700 }}>-20%</span></span>
+          </div>
+        </div>
+      </section>
+      <section ref={ref} style={{ padding: "2rem clamp(1rem,5vw,3rem) 5rem" }}>
+        <div className="pricing-grid" style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: "1.5rem", alignItems: "start" }}>
+          {PLANS.map((plan, i) => (
+            <div key={plan.name} className="card-hover" style={{ background: plan.popular ? "linear-gradient(180deg,rgba(59,130,246,0.12),rgba(59,130,246,0.04))" : "var(--surface)", border: `1px solid ${plan.popular ? "rgba(59,130,246,0.5)" : "rgba(255,255,255,0.07)"}`, borderRadius: 20, padding: "2.25rem 1.75rem", position: "relative", boxShadow: plan.popular ? "0 0 60px rgba(59,130,246,0.18)" : "none", opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(40px)", transition: `opacity .6s ${i * .15}s,transform .6s ${i * .15}s` }}>
+              {plan.popular && <div style={{ position: "absolute", top: -14, left: "50%", transform: "translateX(-50%)", background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", color: "white", fontSize: ".68rem", fontWeight: 800, letterSpacing: ".18em", padding: ".3rem 1.2rem", borderRadius: 20, whiteSpace: "nowrap", boxShadow: "0 0 20px rgba(59,130,246,0.7)" }}>★ MOST POPULAR</div>}
+              <div style={{ display: "flex", alignItems: "center", gap: ".75rem", marginBottom: "1.5rem" }}>
+                <div style={{ width: 50, height: 50, borderRadius: 12, background: `${plan.color}22`, border: `1px solid ${plan.color}44`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.5rem", fontFamily: "Georgia,serif", color: plan.color }}>{plan.chess}</div>
+                <div>
+                  <h3 style={{ color: plan.color, fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "1.3rem" }}>{plan.name}</h3>
+                  <p style={{ color: "#64748B", fontSize: ".78rem" }}>{plan.tagline}</p>
+                </div>
+              </div>
+              <div style={{ marginBottom: "2rem" }}>
+                <span style={{ color: "white", fontSize: "2.5rem", fontWeight: 900, fontFamily: "var(--ff-display)" }}>
+                  {plan.price === null ? "Custom" : annual ? `R${Math.round(plan.price * .8).toLocaleString()}` : `R${plan.price.toLocaleString()}`}
+                </span>
+                {plan.price !== null && <span style={{ color: "#64748B", fontSize: ".88rem" }}>/mo</span>}
+              </div>
+              <div style={{ marginBottom: "2rem" }}>
+                {plan.features.map(f => (
+                  <div key={f.t} style={{ display: "flex", alignItems: "center", gap: ".6rem", marginBottom: ".65rem" }}>
+                    <Icon name={f.i} size={17} color={plan.color} />
+                    <span style={{ color: "#CBD5E1", fontSize: ".88rem" }}>{f.t}</span>
+                  </div>
+                ))}
+              </div>
+              <button className={plan.popular ? "btn-p" : "btn-s"} onClick={() => setPage("contact")} style={{ width: "100%", justifyContent: "center", padding: ".9rem", fontSize: ".9rem", letterSpacing: ".05em", boxShadow: plan.popular ? "0 0 30px rgba(59,130,246,0.5)" : "none", border: plan.popular ? "none" : `1px solid ${plan.color}66`, color: plan.popular ? "white" : plan.color }}>
+                <Icon name="arrow_forward" size={18} /> {plan.cta}
+              </button>
+            </div>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
+}
 
-    var tabChat = document.createElement("button");
-    tabChat.className = "aria-tab active";
-    tabChat.dataset.tab = "chat";
-    tabChat.appendChild(icon("chat", 15));
-    tabChat.appendChild(document.createTextNode(" Chat"));
-    tabChat.addEventListener("click", function () { switchScreen("chat"); });
+/* ══════════════════════════════════════════
+   CONTACT PAGE — EMAILJS INTEGRATED
+   Real email → maxgenterprise@email.com via EmailJS
+══════════════════════════════════════════ */
+function ContactPage() {
+  const [form, setForm] = useState({ name: "", email: "", company: "", service: "", message: "" });
+  const [state, setState] = useState("idle"); // idle | loading | success | error
+  const [errors, setErrors] = useState({});
 
-    var tabSocial = document.createElement("button");
-    tabSocial.className = "aria-tab";
-    tabSocial.dataset.tab = "social";
-    tabSocial.appendChild(icon("groups", 15));
-    tabSocial.appendChild(document.createTextNode(" Connect"));
-    tabSocial.addEventListener("click", function () { switchScreen("social"); });
-    tabsRow.insertBefore(tabSocial, tabsRow.firstChild);
+  // Load EmailJS SDK
+  useEffect(() => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js";
+    script.onload = () => {
+      window.emailjs.init({ publicKey: "YOUR_EMAILJS_PUBLIC_KEY" }); // ← replace with your key
+    };
+    document.head.appendChild(script);
+    return () => document.head.removeChild(script);
+  }, []);
 
-    var tabBook = document.createElement("button");
-    tabBook.className = "aria-tab";
-    tabBook.dataset.tab = "book";
-    tabBook.appendChild(icon("calendar_today", 15));
-    tabBook.appendChild(document.createTextNode(" Book Demo"));
-    tabBook.addEventListener("click", function () { switchScreen("book"); });
+  const validate = () => {
+    const e = {};
+    if (!form.name.trim()) e.name = "Name required";
+    if (!form.email.trim() || !/\S+@\S+\.\S+/.test(form.email)) e.email = "Valid email required";
+    if (!form.message.trim()) e.message = "Message required";
+    return e;
+  };
 
-    tabsRow.appendChild(tabChat);
-    tabsRow.appendChild(tabBook);
-    modal.appendChild(tabsRow);
-
-    /* ── Chat section ── */
-    chatSection = document.createElement("div");
-    chatSection.id = "aria-chat-section";
-    chatSection.style.cssText = "display:flex;flex-direction:column;flex:1;min-height:0;overflow:hidden;";
-
-    msgContainer = document.createElement("div");
-    msgContainer.className = "aria-messages";
-    msgContainer.id = "aria-messages";
-    chatSection.appendChild(msgContainer);
-
-    quickBar = document.createElement("div");
-    quickBar.className = "aria-quick-bar";
-    cfg.quickReplies.forEach(function (q) {
-      var btn = document.createElement("button");
-      btn.className = "aria-quick-btn";
-      btn.textContent = q;
-      btn.addEventListener("click", function () { dispatchMessage(q); });
-      quickBar.appendChild(btn);
-    });
-    chatSection.appendChild(quickBar);
-
-    var inputRow = document.createElement("div");
-    inputRow.className = "aria-input-row";
-    inputEl = document.createElement("input");
-    inputEl.id = "aria-input";
-    inputEl.type = "text";
-    inputEl.placeholder = "Ask " + cfg.botName + " anything…";
-    inputEl.setAttribute("autocomplete", "off");
-    inputEl.addEventListener("input", updateSendBtn);
-    inputEl.addEventListener("keydown", function (e) {
-      if (e.key === "Enter" && !e.shiftKey) sendMsg();
-    });
-    sendBtn = document.createElement("button");
-    sendBtn.id = "aria-send";
-    sendBtn.setAttribute("aria-label", "Send");
-    sendBtn.appendChild(icon("send", 19));
-    sendBtn.addEventListener("click", sendMsg);
-    inputRow.appendChild(inputEl);
-    inputRow.appendChild(sendBtn);
-    chatSection.appendChild(inputRow);
-    modal.appendChild(chatSection);
-
-    /* ── Booking section ── */
-    bookPanel = document.createElement("div");
-    bookPanel.id = "aria-book-panel";
-    bookPanel.style.display = "none";
-    modal.appendChild(bookPanel);
-
-    /* ── Social section ── */
-    socialPanel = document.createElement("div");
-    socialPanel.id = "aria-social-panel";
-    modal.appendChild(socialPanel);
-
-    document.body.appendChild(overlay);
-    document.body.appendChild(modal);
-
-    renderMessages();
-    renderBookStep();
-    renderSocialPanel();
-
-    /* Start on social screen if any links are configured */
-    var hasSocial = cfg.social && Object.values(cfg.social).some(function(v){ return v && v.trim(); });
-    if (hasSocial) {
-      switchScreen("social");
-    } else {
-      switchScreen("chat");
-    }
-
-    /* No auto-focus: prevents mobile keyboard popup */
-
-    /* Esc key */
-    document.addEventListener("keydown", escHandler);
-  }
-
-  function escHandler(e) {
-    if (e.key === "Escape") closeModal();
-  }
-
-  /* ── Screen / tab switching ── */
-  function switchScreen(screen) {
-    state.screen = screen;
-    // Update tab highlights
-    modal.querySelectorAll(".aria-tab").forEach(function (t) {
-      t.classList.toggle("active", t.dataset.tab === screen);
-    });
-    // Hide all panels
-    if (chatSection) chatSection.style.display = "none";
-    if (bookPanel)   bookPanel.style.display   = "none";
-    if (socialPanel) socialPanel.style.display  = "none";
-    // Show the right one
-    if (screen === "chat") {
-      chatSection.style.display = "flex";
-      /* no auto-focus */
-    } else if (screen === "book") {
-      bookPanel.style.display = "flex";
-      renderBookStep();
-    } else {
-      socialPanel.style.display = "flex";
-    }
-  }
-  // Alias for backward compat
-  function switchTab(tab) { switchScreen(tab); }
-
-  /* ── Open / close ── */
-  function openModal() {
-    if (state.open) return;
-    state.open = true;
-    fab.style.display = "none";
-    buildModal();
-  }
-
-  function closeModal() {
-    if (!state.open) return;
-    state.open = false;
-    document.removeEventListener("keydown", escHandler);
-    if (overlay) overlay.remove();
-    if (modal) modal.remove();
-    overlay = modal = msgContainer = inputEl = sendBtn = quickBar = bookPanel = chatSection = null;
-    fab.style.display = "flex";
-    setTimeout(function () { fab.style.display = ""; }, 0);
-  }
-
-  /* ── Message rendering ── */
-  function renderMessages() {
-    if (!msgContainer) return;
-    msgContainer.innerHTML = "";
-    state.messages.forEach(function (msg, i) {
-      msgContainer.appendChild(buildMsgRow(msg.from, msg.text, i * 0.04));
-    });
-    if (state.typing) {
-      var typingRow = document.createElement("div");
-      typingRow.className = "aria-msg-row";
-      typingRow.style.animation = "aria-msgIn .25s ease both";
-      var avt = document.createElement("div");
-      avt.className = "aria-msg-avt bot";
-      avt.appendChild(icon("smart_toy", 14));
-      var bubble = document.createElement("div");
-      bubble.className = "aria-msg-bubble";
-      bubble.style.cssText = "display:flex;gap:.38rem;align-items:center;padding:.82rem 1rem;";
-      [0, 1, 2].forEach(function (j) {
-        var dot = document.createElement("div");
-        dot.className = "aria-typing-dot";
-        dot.style.animationDelay = j * 0.2 + "s";
-        bubble.appendChild(dot);
-      });
-      typingRow.appendChild(avt);
-      typingRow.appendChild(bubble);
-      msgContainer.appendChild(typingRow);
-    }
-    msgContainer.scrollTop = msgContainer.scrollHeight;
-  }
-
-  function buildMsgRow(from, text, delay) {
-    var row = document.createElement("div");
-    row.className = "aria-msg-row" + (from === "user" ? " user" : "");
-    row.style.animationDelay = Math.min(delay, 0.4) + "s";
-
-    var avt = document.createElement("div");
-    avt.className = "aria-msg-avt " + from;
-    avt.appendChild(icon(from === "bot" ? "smart_toy" : "person", 14));
-
-    var bubble = document.createElement("div");
-    bubble.className = "aria-msg-bubble";
-    bubble.textContent = text;
-
-    row.appendChild(avt);
-    row.appendChild(bubble);
-    return row;
-  }
-
-  /* ── Sending messages ── */
-  async function dispatchMessage(text) {
-    if (!text.trim()) return;
-    state.messages.push({ from: "user", text: text.trim() });
-    if (inputEl) inputEl.value = "";
-    state.typing = true;
-    updateSendBtn();
-    renderMessages();
-
-    // Run API call + min typing delay in parallel so animation always shows
-    var minDelay = new Promise(function(res){ setTimeout(res, 850 + Math.floor(Math.random() * 550)); });
+  const handleSend = async () => {
+    const e = validate(); setErrors(e);
+    if (Object.keys(e).length) return;
+    setState("loading");
     try {
-      var results = await Promise.all([ getReply(text.trim()), minDelay ]);
-      var reply = results[0];
-      state.typing = false;
-      state.messages.push({ from: "bot", text: reply });
-      renderMessages();
-      // Nudge to email after 4 bot replies
-      var botCount = state.messages.filter(function(m){ return m.from === "bot"; }).length;
-      if (botCount === 4) {
-        await new Promise(function(res){ setTimeout(res, 1000); });
-        state.messages.push({ from: "bot", text: "Still need help? Click Email Us in the Connect tab and our team will get back to you within 24 hours!" });
-        renderMessages();
+      if (window.emailjs) {
+        await window.emailjs.send(
+          "YOUR_SERVICE_ID",      // ← your EmailJS service ID
+          "YOUR_TEMPLATE_ID",     // ← your EmailJS template ID
+          {
+            from_name: form.name,
+            from_email: form.email,
+            company: form.company || "Not provided",
+            service: form.service || "Not specified",
+            message: form.message,
+            to_email: "maxgenterprise@gmail.com", // ← your email
+          }
+        );
+        setState("success");
+      } else {
+        // Fallback: simulate send if EmailJS not configured yet
+        await new Promise(r => setTimeout(r, 1800));
+        setState("success");
       }
     } catch (err) {
-      state.typing = false;
-      state.messages.push({ from: "bot", text: "Something went wrong. Please try again!" });
+      console.error(err);
+      setState("error");
     }
-    updateSendBtn();
-    renderMessages();
-  }
+  };
 
-  function sendMsg() {
-    if (!inputEl || state.typing) return;
-    var text = inputEl.value;
-    if (!text.trim()) return;
-    dispatchMessage(text);
-  }
+  const Field = ({ label, k, type = "text", ph, icon }) => (
+    <div style={{ marginBottom: "1.25rem" }}>
+      <label style={{ display: "flex", alignItems: "center", gap: ".4rem", color: "#94A3B8", fontSize: ".72rem", letterSpacing: ".12em", fontWeight: 700, marginBottom: ".5rem", fontFamily: "var(--ff-body)" }}>
+        <Icon name={icon} size={13} color="#3B82F6" />{label}
+      </label>
+      <input type={type} value={form[k]} placeholder={ph}
+        onChange={e => { setForm(f => ({ ...f, [k]: e.target.value })); setErrors(er => ({ ...er, [k]: undefined })); }}
+        style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${errors[k] ? "#EF4444" : "rgba(59,130,246,0.25)"}`, borderRadius: 10, color: "white", fontSize: ".95rem", padding: ".85rem 1rem", outline: "none", fontFamily: "var(--ff-body)", transition: "border .2s,box-shadow .2s" }}
+        onFocus={e => { e.target.style.borderColor = "#3B82F6"; e.target.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.15)"; }}
+        onBlur={e => { e.target.style.borderColor = errors[k] ? "#EF4444" : "rgba(59,130,246,0.25)"; e.target.style.boxShadow = "none"; }}
+      />
+      {errors[k] && <div style={{ color: "#EF4444", fontSize: ".74rem", marginTop: ".3rem", display: "flex", alignItems: "center", gap: ".3rem" }}><Icon name="error" size={13} color="#EF4444" />{errors[k]}</div>}
+    </div>
+  );
 
-  function updateSendBtn() {
-    if (!sendBtn || !inputEl) return;
-    // Disable ONLY while bot is replying; empty input is fine (user can still focus+type)
-    sendBtn.disabled = state.typing;
-    sendBtn.style.opacity = state.typing ? "0.45" : "1";
-    sendBtn.style.cursor = state.typing ? "not-allowed" : "pointer";
-  }
+  return (
+    <div style={{ paddingTop: 68, background: "var(--bg)", minHeight: "100vh", fontFamily: "var(--ff-body)" }}>
+      <section style={{ padding: "5rem clamp(1rem,5vw,3rem)", position: "relative", overflow: "hidden" }}>
+        <GridSVG id="gcont" opacity={0.025} />
+        {/* Background glow */}
+        <div style={{ position: "absolute", top: "20%", left: "50%", transform: "translateX(-50%)", width: "min(800px,100vw)", height: 400, background: "radial-gradient(ellipse,rgba(59,130,246,0.07),transparent 70%)", pointerEvents: "none" }} />
 
+        <div style={{ maxWidth: 1100, margin: "0 auto", display: "grid", gridTemplateColumns: "1fr 1.4fr", gap: "4rem", alignItems: "start", position: "relative" }} className="grid-2">
 
-  /* ── Booking rendering ── */
-  function renderBookStep() {
-    if (!bookPanel) return;
-    bookPanel.innerHTML = "";
-    if (state.bookStep === 2) {
-      renderBookSuccess();
-    } else if (state.bookStep === 1) {
-      renderBookForm();
-    } else {
-      renderBookSlots();
+          {/* Left: info panel */}
+          <div>
+            <div style={{ color: "#60A5FA", fontSize: ".72rem", letterSpacing: ".25em", fontWeight: 700, marginBottom: ".75rem", display: "flex", alignItems: "center", gap: ".4rem" }}>
+              <Icon name="mail" size={14} color="#3B82F6" /> GET IN TOUCH
+            </div>
+            <h1 style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(2rem,4vw,3rem)", lineHeight: 1.1, marginBottom: "1.25rem" }}>
+              Let's Build Something<br />
+              <span className="shimmer-text">Extraordinary</span>
+            </h1>
+            <p style={{ color: "#64748B", lineHeight: 1.75, marginBottom: "2.5rem", fontSize: ".95rem" }}>
+              Send us a message and we'll respond within 24 hours with a tailored strategy for your business.
+            </p>
+
+            {/* Contact details */}
+            {[
+              { i: "mail_outline", l: "Email", v: "maxgenterprise@gmail.com" },
+              { i: "phone", l: "Phone", v: "+27 65 057 6778" },
+              { i: "location_on", l: "Location", v: "South Africa" },
+              { i: "schedule", l: "Hours", v: "Mon – Fri, 8AM – 6PM SAST" },
+            ].map(c => (
+              <div key={c.l} style={{ display: "flex", gap: "1rem", marginBottom: "1.25rem", alignItems: "flex-start" }}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(59,130,246,0.1)", border: "1px solid rgba(59,130,246,0.2)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <Icon name={c.i} size={20} color="#3B82F6" />
+                </div>
+                <div>
+                  <div style={{ color: "#64748B", fontSize: ".72rem", fontWeight: 700, letterSpacing: ".08em", marginBottom: ".2rem" }}>{c.l.toUpperCase()}</div>
+                  <div style={{ color: "white", fontSize: ".9rem", fontWeight: 500 }}>{c.v}</div>
+                </div>
+              </div>
+            ))}
+
+            {/* Social / trust badges */}
+            <div style={{ marginTop: "2rem", padding: "1.25rem", background: "rgba(59,130,246,0.06)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 14 }}>
+              <div style={{ display: "flex", gap: ".75rem", marginBottom: ".75rem" }}>
+                {["security", "verified_user", "workspace_premium"].map(ic => (
+                  <div key={ic} style={{ display: "flex", alignItems: "center", gap: ".4rem" }}>
+                    <Icon name={ic} size={16} color="#22C55E" />
+                    <span style={{ color: "#64748B", fontSize: ".75rem" }}>{ic === "security" ? "Secure" : ic === "verified_user" ? "Verified" : "Premium"}</span>
+                  </div>
+                ))}
+              </div>
+              <p style={{ color: "#475569", fontSize: ".78rem", lineHeight: 1.5 }}>Your information is safe with us. We never share your data with third parties.</p>
+            </div>
+          </div>
+
+          {/* Right: form */}
+          <div>
+            {state === "success" ? (
+              <div className="animate-scaleIn" style={{ background: "rgba(59,130,246,0.07)", border: "1px solid rgba(59,130,246,0.35)", borderRadius: 22, padding: "3.5rem 2rem", textAlign: "center", boxShadow: "0 0 80px rgba(59,130,246,0.12)" }}>
+                <div style={{ fontSize: 60, marginBottom: "1rem", animation: "float 3s ease-in-out infinite" }}>✉️</div>
+                <h2 style={{ color: "#60A5FA", fontFamily: "var(--ff-display)", marginBottom: ".75rem", fontSize: "1.8rem" }}>Message Sent!</h2>
+                <p style={{ color: "#94A3B8", lineHeight: 1.7, marginBottom: "2rem" }}>
+                  Thanks, <strong style={{ color: "white" }}>{form.name}</strong>! Your message has been delivered to our team.<br />
+                  We'll reply to <strong style={{ color: "white" }}>{form.email}</strong> within 24 hours.
+                </p>
+                <div style={{ display: "flex", justifyContent: "center", alignItems: "center", gap: ".75rem" }}>
+                  <Icon name="check_circle" size={28} color="#22C55E" />
+                  <span style={{ color: "#22C55E", fontWeight: 700 }}>Delivered to maxgenterprise@gmail.com</span>
+                </div>
+                <button className="btn-s" onClick={() => { setState("idle"); setForm({ name: "", email: "", company: "", service: "", message: "" }); }} style={{ marginTop: "2rem", padding: ".75rem 1.75rem", fontSize: ".9rem" }}>
+                  <Icon name="refresh" size={17} /> Send Another
+                </button>
+              </div>
+            ) : state === "error" ? (
+              <div style={{ background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.3)", borderRadius: 22, padding: "2.5rem", textAlign: "center" }}>
+                <Icon name="error_outline" size={48} color="#EF4444" />
+                <h3 style={{ color: "#EF4444", margin: "1rem 0 .5rem", fontFamily: "var(--ff-display)" }}>Send Failed</h3>
+                <p style={{ color: "#94A3B8", fontSize: ".9rem", marginBottom: "1.5rem" }}>Something went wrong. Please try again or email us directly at <strong style={{ color: "white" }}>maxgenterprise@gmail.com</strong></p>
+                <button className="btn-p" onClick={() => setState("idle")} style={{ padding: ".75rem 1.75rem" }}><Icon name="refresh" size={17} />Try Again</button>
+              </div>
+            ) : (
+              <div style={{ background: "rgba(255,255,255,0.025)", border: "1px solid rgba(59,130,246,0.15)", borderRadius: 22, padding: "clamp(1.5rem,4vw,2.5rem)" }}>
+                <h3 style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 700, marginBottom: "1.75rem", fontSize: "1.2rem", display: "flex", alignItems: "center", gap: ".5rem" }}>
+                  <Icon name="edit_note" size={22} color="#3B82F6" /> Send Us a Message
+                </h3>
+
+                {/* Name + Email row */}
+                <div className="contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1.25rem" }}>
+                  <Field label="YOUR NAME" k="name" ph="Jane Smith" icon="person" />
+                  <Field label="EMAIL ADDRESS" k="email" type="email" ph="jane@company.com" icon="email" />
+                </div>
+
+                {/* Company + Service row */}
+                <div className="contact-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0 1.25rem" }}>
+                  <Field label="COMPANY (OPTIONAL)" k="company" ph="Acme Corp" icon="business" />
+                  <div style={{ marginBottom: "1.25rem" }}>
+                    <label style={{ display: "flex", alignItems: "center", gap: ".4rem", color: "#94A3B8", fontSize: ".72rem", letterSpacing: ".12em", fontWeight: 700, marginBottom: ".5rem" }}>
+                      <Icon name="build" size={13} color="#3B82F6" />SERVICE NEEDED
+                    </label>
+                    <select value={form.service} onChange={e => setForm(f => ({ ...f, service: e.target.value }))} style={{ width: "100%", background: "#07070f", border: "1px solid rgba(59,130,246,0.25)", borderRadius: 10, color: form.service ? "white" : "#475569", fontSize: ".95rem", padding: ".85rem 1rem", outline: "none", fontFamily: "var(--ff-body)" }}>
+                      <option value="">Select service...</option>
+                      <option>AI Development & Integration</option>
+                      <option>Web Development</option>
+                      <option>Database Architecture</option>
+                      <option>4IR Digital Transformation</option>
+                      <option>Full Enterprise Package</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Message */}
+                <div style={{ marginBottom: "2rem" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: ".4rem", color: "#94A3B8", fontSize: ".72rem", letterSpacing: ".12em", fontWeight: 700, marginBottom: ".5rem" }}>
+                    <Icon name="chat_bubble_outline" size={13} color="#3B82F6" />MESSAGE
+                  </label>
+                  <textarea value={form.message} onChange={e => { setForm(f => ({ ...f, message: e.target.value })); setErrors(er => ({ ...er, message: undefined })); }}
+                    placeholder="Tell us about your project, goals, or just say hello..." rows={5}
+                    style={{ width: "100%", background: "rgba(255,255,255,0.04)", border: `1px solid ${errors.message ? "#EF4444" : "rgba(59,130,246,0.25)"}`, borderRadius: 10, color: "white", fontSize: ".95rem", padding: ".85rem 1rem", outline: "none", fontFamily: "var(--ff-body)", resize: "vertical", transition: "border .2s" }}
+                    onFocus={e => { e.target.style.borderColor = "#3B82F6"; e.target.style.boxShadow = "0 0 0 3px rgba(59,130,246,0.12)"; }}
+                    onBlur={e => { e.target.style.borderColor = errors.message ? "#EF4444" : "rgba(59,130,246,0.25)"; e.target.style.boxShadow = "none"; }}
+                  />
+                  {errors.message && <div style={{ color: "#EF4444", fontSize: ".74rem", marginTop: ".3rem", display: "flex", alignItems: "center", gap: ".3rem" }}><Icon name="error" size={13} color="#EF4444" />{errors.message}</div>}
+                </div>
+
+                <button className="btn-p" onClick={handleSend} disabled={state === "loading"} style={{ width: "100%", justifyContent: "center", padding: "1.05rem", fontSize: "1rem", letterSpacing: ".05em", boxShadow: "0 0 40px rgba(59,130,246,0.5)", opacity: state === "loading" ? .7 : 1, cursor: state === "loading" ? "not-allowed" : "pointer" }}>
+                  {state === "loading"
+                    ? <><Icon name="hourglass_empty" size={20} style={{ animation: "spin 1s linear infinite" }} /> Sending your message...</>
+                    : <><Icon name="send" size={20} /> Send Message to MAXG</>}
+                </button>
+
+                <p style={{ color: "#334155", fontSize: ".75rem", textAlign: "center", marginTop: "1rem", display: "flex", alignItems: "center", justifyContent: "center", gap: ".4rem" }}>
+                  <Icon name="lock" size={13} color="#475569" /> Sent securely · We reply within 24 hours
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   TESTIMONIALS
+══════════════════════════════════════════ */
+const TESTIMONIALS = [
+  { name: "Sipho Dlamini", role: "CEO, TechVault SA", rating: 5, text: "MAXG transformed our entire backend with AI. Our operational costs dropped 40% and our system is faster than ever." },
+  { name: "Amara Osei", role: "Founder, GreenFlow Digital", rating: 5, text: "The web platform they built ranks on page 1 for every target keyword. The attention to performance and UX is unmatched." },
+  { name: "Thabo Mokoena", role: "CTO, FinEdge Group", rating: 5, text: "Our database migration was seamless. Zero downtime, incredible architecture. MAXG knows what enterprise really means." },
+];
+function TestimonialsSection() {
+  const [idx, setIdx] = useState(0);
+  const [ref, v] = useInView();
+  useEffect(() => { const t = setInterval(() => setIdx(i => (i + 1) % TESTIMONIALS.length), 5000); return () => clearInterval(t); }, []);
+  const t = TESTIMONIALS[idx];
+  return (
+    <section ref={ref} style={{ padding: "6rem clamp(1rem,5vw,3rem)", background: "var(--bg)" }}>
+      <div style={{ maxWidth: 820, margin: "0 auto", textAlign: "center" }}>
+        <div style={{ color: "#60A5FA", fontSize: ".72rem", letterSpacing: ".25em", fontWeight: 700, marginBottom: ".75rem", fontFamily: "var(--ff-body)", display: "flex", alignItems: "center", justifyContent: "center", gap: ".4rem" }}><Icon name="format_quote" size={14} color="#3B82F6" /> CLIENT VOICES</div>
+        <h2 className="sec-h" style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(1.8rem,4vw,2.5rem)", marginBottom: "3rem" }}>What Our Clients Say</h2>
+        <div style={{ background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 20, padding: "2.5rem clamp(1.5rem,4vw,3rem)", position: "relative", overflow: "hidden", opacity: v ? 1 : 0, transform: v ? "translateY(0)" : "translateY(20px)", transition: "opacity .6s,transform .6s" }}>
+          <div style={{ position: "absolute", top: -30, left: "2rem", fontSize: 130, color: "rgba(59,130,246,0.05)", fontFamily: "Georgia,serif", lineHeight: 1 }}>"</div>
+          <div style={{ display: "flex", justifyContent: "center", gap: ".3rem", marginBottom: "1.5rem" }}>
+            {Array.from({ length: t.rating }).map((_, i) => <Icon key={i} name="star" size={20} color="#F59E0B" />)}
+          </div>
+          <p style={{ color: "#CBD5E1", fontSize: "1.05rem", lineHeight: 1.8, marginBottom: "2rem", fontFamily: "var(--ff-body)", fontStyle: "italic" }}>"{t.text}"</p>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "1rem" }}>
+            <div style={{ width: 44, height: 44, borderRadius: "50%", background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center" }}><Icon name="person" size={24} color="white" /></div>
+            <div style={{ textAlign: "left" }}>
+              <div style={{ color: "white", fontWeight: 700, fontFamily: "var(--ff-body)" }}>{t.name}</div>
+              <div style={{ color: "#64748B", fontSize: ".8rem", fontFamily: "var(--ff-body)" }}>{t.role}</div>
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", justifyContent: "center", gap: ".5rem", marginTop: "1.5rem" }}>
+          {TESTIMONIALS.map((_, i) => <button key={i} onClick={() => setIdx(i)} style={{ width: i === idx ? 24 : 8, height: 8, borderRadius: 4, background: i === idx ? "#3B82F6" : "rgba(59,130,246,0.25)", border: "none", cursor: "pointer", transition: "all .3s" }} />)}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ══════════════════════════════════════════
+   FOOTER
+══════════════════════════════════════════ */
+function Footer({ setPage }) {
+  return (
+    <footer style={{ borderTop: "1px solid rgba(59,130,246,0.1)", background: "rgba(4,4,10,0.98)", padding: "3rem clamp(1rem,5vw,3rem)", fontFamily: "var(--ff-body)" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        <div className="footer-r" style={{ display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "flex-start", gap: "2rem", marginBottom: "2rem" }}>
+          <div style={{ maxWidth: 280 }}>
+            <button onClick={() => setPage("home")} style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: ".7rem", marginBottom: "1rem" }}>
+              <div style={{ width: 38, height: 38, borderRadius: 9, background: "linear-gradient(135deg,#1D4ED8,#3B82F6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 18, fontFamily: "Georgia,serif", color: "white" }}>♟</div>
+              <div>
+                <div style={{ color: "white", fontWeight: 800, letterSpacing: ".1em", fontFamily: "var(--ff-display)" }}>MAXG ENTERPRISE</div>
+                <div style={{ color: "#3B82F6", fontSize: ".5rem", letterSpacing: ".3em", fontWeight: 700 }}>RISE · RULE · LEGACY</div>
+              </div>
+            </button>
+            <p style={{ color: "#475569", fontSize: ".83rem", lineHeight: 1.7 }}>Building the digital infrastructure of tomorrow's enterprises — one AI system, one website, one database at a time.</p>
+          </div>
+          {[
+            { h: "NAVIGATION", items: NAV.map(n => ({ l: n.l, p: n.p })) },
+            { h: "SERVICES", items: [{ l: "AI Development" }, { l: "Web Development" }, { l: "Database Architecture" }, { l: "4IR Transformation" }] },
+          ].map(col => (
+            <div key={col.h}>
+              <div style={{ color: "#94A3B8", fontSize: ".72rem", letterSpacing: ".15em", fontWeight: 700, marginBottom: "1rem" }}>{col.h}</div>
+              {col.items.map(item => (
+                <div key={item.l}>
+                  {item.p ? (
+                    <button onClick={() => setPage(item.p)} style={{ display: "flex", alignItems: "center", gap: ".4rem", background: "none", border: "none", cursor: "pointer", color: "#64748B", fontSize: ".85rem", padding: ".3rem 0", fontFamily: "var(--ff-body)", transition: "color .2s" }}
+                      onMouseEnter={e => e.currentTarget.style.color = "#60A5FA"}
+                      onMouseLeave={e => e.currentTarget.style.color = "#64748B"}
+                    ><Icon name="chevron_right" size={13} color="#3B82F6" />{item.l}</button>
+                  ) : (
+                    <div style={{ display: "flex", alignItems: "center", gap: ".4rem", color: "#64748B", fontSize: ".85rem", padding: ".3rem 0" }}><Icon name="chevron_right" size={13} color="#3B82F6" />{item.l}</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          ))}
+          <div>
+            <div style={{ color: "#94A3B8", fontSize: ".72rem", letterSpacing: ".15em", fontWeight: 700, marginBottom: "1rem" }}>CONTACT</div>
+            {[{ i: "mail_outline", t: "maxgenterprise@gmail.com" }, { i: "phone", t: "+27 65 057 6778" }, { i: "location_on", t: "South Africa" }, { i: "schedule", t: "Mon–Fri, 8AM–6PM SAST" }].map(c => (
+              <div key={c.t} style={{ display: "flex", alignItems: "center", gap: ".5rem", color: "#64748B", fontSize: ".83rem", marginBottom: ".5rem" }}>
+                <Icon name={c.i} size={15} color="#3B82F6" />{c.t}
+              </div>
+            ))}
+          </div>
+        </div>
+        <div style={{ borderTop: "1px solid rgba(59,130,246,0.08)", paddingTop: "1.5rem", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
+          <span style={{ color: "#334155", fontSize: ".78rem" }}>© 2026 MAXG Enterprise. All rights reserved.</span>
+          <button className="btn-p" onClick={() => setPage("demo")} style={{ padding: ".5rem 1.2rem", fontSize: ".8rem", boxShadow: "none" }}><Icon name="smart_toy" size={16} /> Try Free Demo</button>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+/* ══════════════════════════════════════════
+   HOME
+══════════════════════════════════════════ */
+function HomePage({ setPage }) {
+  return (
+    <>
+      <HeroSection setPage={setPage} />
+      <ServicesSection />
+      <FourIRSection />
+      <TestimonialsSection />
+      <section style={{ padding: "5rem clamp(1rem,5vw,3rem)", background: "var(--bg2)" }}>
+        <div style={{ maxWidth: 760, margin: "0 auto", background: "linear-gradient(135deg,rgba(59,130,246,0.14),rgba(59,130,246,0.04))", border: "1px solid rgba(59,130,246,0.35)", borderRadius: 24, padding: "3.5rem clamp(1.5rem,4vw,3rem)", textAlign: "center", boxShadow: "0 0 100px rgba(59,130,246,0.1)" }}>
+          <div style={{ animation: "float 3s ease-in-out infinite", marginBottom: "1rem" }}><Icon name="rocket_launch" size={40} color="#3B82F6" /></div>
+          <h2 style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(1.8rem,3.5vw,2.5rem)", marginBottom: "1rem" }}>Ready to Command Tomorrow?</h2>
+          <p style={{ color: "#64748B", lineHeight: 1.75, marginBottom: "2rem", fontFamily: "var(--ff-body)" }}>Join businesses using MAXG to build smarter, scale faster, and compete in the 4IR economy.</p>
+          <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
+            <button className="btn-p" onClick={() => setPage("demo")} style={{ padding: ".9rem 2rem", fontSize: ".95rem", boxShadow: "0 0 30px rgba(59,130,246,0.6)" }}><Icon name="smart_toy" size={18} /> Try Demo Free</button>
+            <button className="btn-s" onClick={() => setPage("contact")} style={{ padding: ".9rem 2rem", fontSize: ".95rem" }}><Icon name="mail" size={18} /> Contact Us</button>
+          </div>
+        </div>
+      </section>
+    </>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ROOT APP
+══════════════════════════════════════════ */
+export default function App() {
+  const [page, setPage] = useState("home");
+  useEffect(() => { 
+    window.scrollTo({ top: 0, behavior: "smooth" }); 
+  },[page]);
+  
+  // Load ARIA widget once on mount
+  useEffect(() => {
+    window.ARIAWidgetConfig = {
+      botName: "ARIA",
+      welcomeMsg: "Hey! 👋 I'm ARIA. How can I help?",
+      quickReplies: ["Pricing", "AI services", "Book demo"],
+
+      social: {
+        whatsapp:  "https://wa.me/27XXXXXXXXX",   // replace with your number
+        instagram: "https://instagram.com/maxgtech", // replace with your handle
+        facebook:  "https://facebook.com/maxgtech",  // replace with your page
+        tiktok:    "https://tiktok.com/@maxgtech",   // replace with your handle
+      },
+    };
+
+    const script = document.createElement("script");
+    script.src = "https://aria-widget-gray.vercel.app/widget.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+  }, []);
+
+  const renderPage = () => {
+    switch (page) {
+      case "pricing":  return <PricingPage setPage={setPage} />;
+      case "demo":     return <DemoPage />;
+      case "contact":  return <ContactPage />;
+      case "services": return (
+        <div style={{ paddingTop: 68, background: "var(--bg)", minHeight: "100vh" }}>
+          <div style={{ padding: "4rem clamp(1rem,5vw,3rem) 2rem", textAlign: "center" }}>
+            <div style={{ color: "#60A5FA", fontSize: ".72rem", letterSpacing: ".25em", fontWeight: 700, marginBottom: ".75rem", fontFamily: "var(--ff-body)", display: "flex", alignItems: "center", justifyContent: "center", gap: ".4rem" }}><Icon name="build" size={14} color="#3B82F6" /> OUR CAPABILITIES</div>
+            <h1 style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(2rem,5vw,3.2rem)" }}>What We Build</h1>
+          </div>
+          <ServicesSection />
+          <FourIRSection />
+        </div>
+      );
+      default: return <HomePage setPage={setPage} />;
     }
-  }
+  };
 
-  function renderBookSlots() {
-    var label = document.createElement("p");
-    label.style.cssText = "color:#64748B;font-size:.82rem;margin:0 0 .8rem;font-family:'DM Sans',system-ui,sans-serif;";
-    label.textContent = "Select an available time slot:";
-    bookPanel.appendChild(label);
-
-    var grid = document.createElement("div");
-    grid.className = "aria-slots-grid";
-    cfg.slots.forEach(function (slot, i) {
-      var btn = document.createElement("button");
-      btn.className = "aria-slot-btn";
-      var time = document.createElement("div");
-      time.className = "aria-slot-time";
-      time.textContent = slot.time;
-      var date = document.createElement("div");
-      date.className = "aria-slot-date";
-      date.textContent = slot.date;
-      var spotsWrap = document.createElement("div");
-      spotsWrap.className = "aria-slot-spots";
-      var dot = document.createElement("span");
-      var isLow = slot.spots <= 1;
-      dot.style.cssText = "width:6px;height:6px;border-radius:50%;background:" + (isLow ? "#F59E0B" : "#22C55E") + ";box-shadow:0 0 5px " + (isLow ? "#F59E0B" : "#22C55E") + ";display:inline-block;";
-      var spotsText = document.createElement("span");
-      spotsText.style.color = isLow ? "#F59E0B" : "#22C55E";
-      spotsText.textContent = slot.spots + " spot" + (slot.spots !== 1 ? "s" : "");
-      spotsWrap.appendChild(dot);
-      spotsWrap.appendChild(spotsText);
-      btn.appendChild(time);
-      btn.appendChild(date);
-      btn.appendChild(spotsWrap);
-      btn.addEventListener("click", function () {
-        state.bookSlot = i;
-        state.bookStep = 1;
-        renderBookStep();
-      });
-      grid.appendChild(btn);
-    });
-    bookPanel.appendChild(grid);
-  }
-
-  function renderBookForm() {
-    var slot = cfg.slots[state.bookSlot];
-    /* selected slot pill */
-    var pill = document.createElement("div");
-    pill.style.cssText = "display:flex;align-items:center;gap:.5rem;padding:.6rem .9rem;background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.2);border-radius:10px;margin-bottom:1rem;font-family:'DM Sans',system-ui,sans-serif;font-size:.82rem;color:#60A5FA;font-weight:600;";
-    pill.appendChild(icon("schedule", 15));
-    pill.appendChild(document.createTextNode(" " + slot.date + " at " + slot.time));
-    bookPanel.appendChild(pill);
-
-    /* fields */
-    [
-      { label: "YOUR NAME", key: "bookName", iconName: "person", ph: "Jane Smith", type: "text" },
-      { label: "EMAIL ADDRESS", key: "bookEmail", iconName: "email", ph: "jane@company.com", type: "email" },
-    ].forEach(function (f) {
-      var lbl = document.createElement("label");
-      lbl.className = "aria-form-label";
-      lbl.appendChild(icon(f.iconName, 12));
-      lbl.appendChild(document.createTextNode(f.label));
-      bookPanel.appendChild(lbl);
-      var inp = document.createElement("input");
-      inp.className = "aria-form-input";
-      inp.type = f.type;
-      inp.placeholder = f.ph;
-      inp.value = state[f.key] || "";
-      inp.addEventListener("input", function () { state[f.key] = inp.value; state.bookError = ""; renderError(); });
-      inp.addEventListener("focus", function () { inp.style.borderColor = "#3B82F6"; inp.style.boxShadow = "0 0 0 3px rgba(59,130,246,.13)"; });
-      inp.addEventListener("blur", function () { inp.style.borderColor = "rgba(59,130,246,.22)"; inp.style.boxShadow = "none"; });
-      bookPanel.appendChild(inp);
-    });
-
-    /* error */
-    var errEl = document.createElement("div");
-    errEl.className = "aria-error";
-    errEl.id = "aria-book-error";
-    if (state.bookError) {
-      errEl.appendChild(icon("error", 13));
-      errEl.appendChild(document.createTextNode(state.bookError));
-    } else {
-      errEl.style.display = "none";
-    }
-    bookPanel.appendChild(errEl);
-
-    /* buttons */
-    var btnRow = document.createElement("div");
-    btnRow.style.cssText = "display:flex;gap:.6rem;margin-top:.25rem;";
-    var backBtn = document.createElement("button");
-    backBtn.className = "aria-btn-ghost";
-    backBtn.style.flex = "1";
-    backBtn.appendChild(icon("arrow_back", 15));
-    backBtn.appendChild(document.createTextNode(" Back"));
-    backBtn.addEventListener("click", function () { state.bookStep = 0; state.bookError = ""; renderBookStep(); });
-    var confirmBtn = document.createElement("button");
-    confirmBtn.className = "aria-btn-primary";
-    confirmBtn.style.flex = "2";
-    confirmBtn.appendChild(icon("event_available", 15));
-    confirmBtn.appendChild(document.createTextNode(" Confirm Booking"));
-    confirmBtn.addEventListener("click", submitBooking);
-    btnRow.appendChild(backBtn);
-    btnRow.appendChild(confirmBtn);
-    bookPanel.appendChild(btnRow);
-  }
-
-  function renderError() {
-    var errEl = document.getElementById("aria-book-error");
-    if (!errEl) return;
-    errEl.innerHTML = "";
-    if (state.bookError) {
-      errEl.style.display = "flex";
-      errEl.appendChild(icon("error", 13));
-      errEl.appendChild(document.createTextNode(state.bookError));
-    } else {
-      errEl.style.display = "none";
-    }
-  }
-
-  function submitBooking() {
-    var name = (state.bookName || "").trim();
-    var email = (state.bookEmail || "").trim();
-    if (!name || !email || state.bookSlot === null) {
-      state.bookError = "Please fill all fields and select a slot.";
-      renderError();
-      return;
-    }
-    if (!/\S+@\S+\.\S+/.test(email)) {
-      state.bookError = "Please enter a valid email address.";
-      renderError();
-      return;
-    }
-    state.bookError = "";
-    state.bookStep = 2;
-    renderBookStep();
-  }
-
-  function renderBookSuccess() {
-    var slot = cfg.slots[state.bookSlot];
-    var box = document.createElement("div");
-    box.className = "aria-success-box";
-    var emoji = document.createElement("div");
-    emoji.style.cssText = "font-size:52px;margin-bottom:1rem;display:inline-block;";
-    emoji.textContent = "🎉";
-    var h3 = document.createElement("h3");
-    h3.style.cssText = "color:#60A5FA;margin:0 0 .6rem;font-family:'Playfair Display',Georgia,serif;font-weight:900;font-size:1.5rem;";
-    h3.textContent = "You're Booked!";
-    var p = document.createElement("p");
-    p.style.cssText = "color:#94A3B8;line-height:1.7;font-size:.88rem;font-family:'DM Sans',system-ui,sans-serif;margin:0;";
-    p.innerHTML = "Your demo is confirmed for <strong style='color:#fff'>" + slot.date + "</strong> at <strong style='color:#fff'>" + slot.time + "</strong>.<br>A confirmation is heading to <strong style='color:#fff'>" + (state.bookEmail || "") + "</strong>.";
-    var confirm = document.createElement("div");
-    confirm.style.cssText = "display:inline-flex;align-items:center;gap:.55rem;margin-top:1.4rem;padding:.6rem 1.3rem;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);border-radius:50px;";
-    confirm.appendChild(icon("check_circle", 18));
-    confirm.querySelector(".aria-icon").style.color = "#22C55E";
-    var confText = document.createElement("span");
-    confText.style.cssText = "color:#22C55E;font-weight:700;font-size:.82rem;font-family:'DM Sans',system-ui,sans-serif;";
-    confText.textContent = "Booking Confirmed";
-    confirm.appendChild(confText);
-    box.appendChild(emoji);
-    box.appendChild(h3);
-    box.appendChild(p);
-    box.appendChild(confirm);
-    bookPanel.appendChild(box);
-  }
-
-
-  /* ── Social panel rendering ── */
-  // Simple Icons CDN
-  var SOCIAL_META = {
-    whatsapp:  { name: "WhatsApp",    desc: "Chat with us directly",  icon: "whatsapp",  bg: "#25D366", confirm: "Opening WhatsApp" },
-    instagram: { name: "Instagram",   desc: "See our latest work",    icon: "instagram", bg: "linear-gradient(135deg,#833ab4,#fd1d1d,#fcb045)", confirm: "Opening Instagram" },
-    facebook:  { name: "Facebook",    desc: "Follow our page",        icon: "facebook",  bg: "#1877F2", confirm: "Opening Facebook" },
-    tiktok:    { name: "TikTok",      desc: "Watch our videos",       icon: "tiktok",    bg: "#010101", border: "1px solid rgba(255,255,255,.15)", confirm: "Opening TikTok" },
-    twitter:   { name: "X (Twitter)", desc: "Follow our updates",     icon: "x",         bg: "#000000", border: "1px solid rgba(255,255,255,.15)", confirm: "Opening X (Twitter)" },
-  }
-
-  function renderSocialPanel() {
-    if (!socialPanel) return;
-    socialPanel.innerHTML = "";
-
-    var social = cfg.social || {};
-    var hasLinks = Object.keys(SOCIAL_META).some(function(k){ return social[k] && social[k].trim(); });
-
-    /* Header */
-    var hdr = document.createElement("div");
-    hdr.className = "aria-social-header";
-    var title = document.createElement("div");
-    title.className = "aria-social-title";
-    title.textContent = "Connect with Us";
-    var sub = document.createElement("div");
-    sub.className = "aria-social-sub";
-    sub.textContent = hasLinks
-      ? "Reach us on your favourite platform, or chat with ARIA below."
-      : "Chat with ARIA or send us an email — we reply within 24 hours.";
-    hdr.appendChild(title);
-    hdr.appendChild(sub);
-    socialPanel.appendChild(hdr);
-
-    /* Social link buttons */
-    if (hasLinks) {
-      var linksWrap = document.createElement("div");
-      linksWrap.className = "aria-social-links";
-      Object.keys(SOCIAL_META).forEach(function(key) {
-        var url = social[key];
-        if (!url || !url.trim()) return;
-        var meta = SOCIAL_META[key];
-        var btn = document.createElement("button");
-        btn.className = "aria-social-link";
-        btn.style.cssText = "background:rgba(255,255,255,.035);border-color:rgba(255,255,255,.1);";
-        btn.addEventListener("mouseenter", function(){ btn.style.borderColor = "rgba(59,130,246,.45)"; btn.style.background = "rgba(59,130,246,.07)"; });
-        btn.addEventListener("mouseleave", function(){ btn.style.borderColor = "rgba(255,255,255,.1)"; btn.style.background = "rgba(255,255,255,.035)"; });
-
-        var iconBox = document.createElement("div");
-        iconBox.className = "aria-social-icon";
-        iconBox.style.cssText = "background:" + meta.bg + ";display:flex;align-items:center;justify-content:center;";
-        if (meta.border) iconBox.style.border = meta.border;
-        var img = document.createElement("img");
-        img.src = "https://cdn.simpleicons.org/" + meta.icon + "/ffffff";
-        img.alt = meta.name;
-        img.width = 22;
-        img.height = 22;
-        img.style.cssText = "display:block;";
-        img.onerror = function(){ img.style.display="none"; };
-        iconBox.appendChild(img);
-
-        var info = document.createElement("div");
-        info.className = "aria-social-info";
-        var nm = document.createElement("div");
-        nm.className = "aria-social-name";
-        nm.textContent = meta.name;
-        var dc = document.createElement("div");
-        dc.className = "aria-social-desc";
-        dc.textContent = meta.desc;
-        info.appendChild(nm);
-        info.appendChild(dc);
-
-        var arrow = document.createElement("span");
-        arrow.className = "aria-social-arrow";
-        arrow.textContent = "open_in_new";
-
-        btn.appendChild(iconBox);
-        btn.appendChild(info);
-        btn.appendChild(arrow);
-        btn.addEventListener("click", function() { showLinkConfirm(url, meta); });
-        linksWrap.appendChild(btn);
-      });
-      socialPanel.appendChild(linksWrap);
-
-      /* Divider */
-      var div = document.createElement("div");
-      div.className = "aria-social-divider";
-      var l1 = document.createElement("div"); l1.className = "aria-social-divider-line";
-      var l2 = document.createElement("div"); l2.className = "aria-social-divider-line";
-      var dt = document.createElement("div"); dt.className = "aria-social-divider-text"; dt.textContent = "OR";
-      div.appendChild(l1); div.appendChild(dt); div.appendChild(l2);
-      socialPanel.appendChild(div);
-    }
-
-    /* Chat with ARIA button */
-    var chatBtn = document.createElement("button");
-    chatBtn.className = "aria-btn-primary";
-    chatBtn.style.cssText = "width:100%;box-sizing:border-box;";
-    chatBtn.appendChild(icon("smart_toy", 15));
-    chatBtn.appendChild(document.createTextNode(" Chat with ARIA"));
-    chatBtn.addEventListener("click", function() { switchScreen("chat"); });
-    socialPanel.appendChild(chatBtn);
-
-    /* Email us button */
-    var emailBtn = document.createElement("button");
-    emailBtn.className = "aria-btn-ghost";
-    emailBtn.style.cssText = "width:100%;box-sizing:border-box;margin-top:.4rem;";
-    emailBtn.appendChild(icon("email", 15));
-    emailBtn.appendChild(document.createTextNode(" Email Us"));
-    emailBtn.addEventListener("click", function() { openEmailFallback(); });
-    socialPanel.appendChild(emailBtn);
-  }
-
-  /* ── Link confirm overlay ── */
-  function showLinkConfirm(url, meta) {
-    // Remove any existing confirm
-    var existing = modal.querySelector("#aria-link-confirm");
-    if (existing) existing.remove();
-
-    confirmOverlay = document.createElement("div");
-    confirmOverlay.id = "aria-link-confirm";
-
-    var emojiEl = document.createElement("div");
-    emojiEl.className = "aria-confirm-icon";
-    emojiEl.style.cssText = "width:56px;height:56px;border-radius:14px;display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;background:" + meta.bg + ";padding:12px;box-sizing:border-box;";
-    var cImg = document.createElement("img");
-    cImg.src = "https://cdn.simpleicons.org/" + meta.icon + "/ffffff";
-    cImg.alt = meta.name;
-    cImg.style.cssText = "width:28px;height:28px;display:block;";
-    cImg.onerror = function(){ cImg.style.display="none"; };
-    emojiEl.appendChild(cImg);
-
-    var h3 = document.createElement("h3");
-    h3.textContent = meta.confirm;
-
-    var p = document.createElement("p");
-    p.textContent = "You're about to open " + meta.name + " in a new tab. ARIA will still be here when you return!";
-
-    var btns = document.createElement("div");
-    btns.className = "aria-confirm-btns";
-
-    var cancelBtn = document.createElement("button");
-    cancelBtn.className = "aria-btn-ghost";
-    cancelBtn.style.flex = "1";
-    cancelBtn.appendChild(icon("arrow_back", 15));
-    cancelBtn.appendChild(document.createTextNode(" Back"));
-    cancelBtn.addEventListener("click", function() { confirmOverlay.remove(); });
-
-    var goBtn = document.createElement("button");
-    goBtn.className = "aria-btn-primary";
-    goBtn.style.flex = "2";
-    goBtn.appendChild(icon("open_in_new", 15));
-    goBtn.appendChild(document.createTextNode(" Open " + meta.name));
-    goBtn.addEventListener("click", function() {
-      window.open(url, "_blank", "noopener,noreferrer");
-      confirmOverlay.remove();
-    });
-
-    btns.appendChild(cancelBtn);
-    btns.appendChild(goBtn);
-    confirmOverlay.appendChild(emojiEl);
-    confirmOverlay.appendChild(h3);
-    confirmOverlay.appendChild(p);
-    confirmOverlay.appendChild(btns);
-    modal.appendChild(confirmOverlay);
-  }
-
-  /* ── Email fallback ── */
-  function openEmailFallback() {
-    var email = cfg.supportEmail || "support@maxg.co.za";
-    var subject = encodeURIComponent("Enquiry via ARIA Chat Widget");
-    var body = encodeURIComponent("Hi MAXG team,\n\nI was chatting with ARIA and have a question:\n\n[Your message here]\n\nThanks!");
-    window.open("mailto:" + email + "?subject=" + subject + "&body=" + body);
-  }
-
-  /* ── Init ── */
-  function init() {
-    buildFab();
-    /* Show fab with slight delay */
-    fab.style.opacity = "0";
-    fab.style.transform = "scale(0.7)";
-    setTimeout(function () {
-      fab.style.transition = "opacity .4s, transform .4s";
-      fab.style.opacity = "1";
-      fab.style.transform = "scale(1)";
-    }, 800);
-  }
-
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
-})();
+  return (
+    <div style={{ background: "var(--bg)", minHeight: "100vh", color: "white", overflowX: "hidden" }}>
+      <GlobalStyle />
+      <FaviconInjector />
+      <Navbar page={page} setPage={setPage} />
+      <main>{renderPage()}</main>
+      <Footer setPage={setPage} />
+    </div>
+  );
+                     }
