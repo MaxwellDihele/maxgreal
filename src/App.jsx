@@ -1146,6 +1146,13 @@ export default function App() {
       botName: "ARIA",
       welcomeMsg: "Hey! 👋 I'm ARIA. How can I help?",
       quickReplies: ["Pricing", "AI services", "Book demo"],
+
+      social: {
+        whatsapp:  "https://wa.me/27XXXXXXXXX",   // replace with your number
+        instagram: "https://instagram.com/maxgtech", // replace with your handle
+        facebook:  "https://facebook.com/maxgtech",  // replace with your page
+        tiktok:    "https://tiktok.com/@maxgtech",   // replace with your handle
+      },
     };
 
     const script = document.createElement("script");
