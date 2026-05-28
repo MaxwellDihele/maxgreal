@@ -1099,7 +1099,6 @@ function Footer({ setPage }) {
         </div>
         <div style={{ borderTop: "1px solid rgba(59,130,246,0.08)", paddingTop: "1.5rem", display: "flex", flexWrap: "wrap", justifyContent: "space-between", alignItems: "center", gap: "1rem" }}>
           <span style={{ color: "#334155", fontSize: ".78rem" }}>© 2026 MAXG Enterprise. All rights reserved.</span>
-          <button className="btn-p" onClick={() => setPage("demo")} style={{ padding: ".5rem 1.2rem", fontSize: ".8rem", boxShadow: "none" }}><Icon name="smart_toy" size={16} /> Try Free Demo</button>
         </div>
       </div>
     </footer>
@@ -1190,4 +1189,4 @@ export default function App() {
       <Footer setPage={setPage} />
     </div>
   );
-                     }
+    }
