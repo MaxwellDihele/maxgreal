@@ -1147,10 +1147,11 @@ export default function App() {
       quickReplies: ["Pricing", "AI services", "Book demo"],
 
       social: {
-        whatsapp:  "https://wa.me/27XXXXXXXXX",   // replace with your number
+        whatsapp:  "https://wa.me/27650576778",   // replace with your number
         instagram: "https://instagram.com/maxgtech", // replace with your handle
-        facebook:  "https://facebook.com/maxgtech",  // replace with your page
-        tiktok:    "https://tiktok.com/@maxgtech",   // replace with your handle
+        facebook:  "https://facebook.com/maxgreal",  // replace with your page
+        xtwitter:  "https://x.com/maxgreal"
+        // replace with your handle
       },
     };
 
