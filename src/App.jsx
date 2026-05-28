@@ -1121,7 +1121,6 @@ function HomePage({ setPage }) {
           <h2 style={{ color: "white", fontFamily: "var(--ff-display)", fontWeight: 900, fontSize: "clamp(1.8rem,3.5vw,2.5rem)", marginBottom: "1rem" }}>Ready to Command Tomorrow?</h2>
           <p style={{ color: "#64748B", lineHeight: 1.75, marginBottom: "2rem", fontFamily: "var(--ff-body)" }}>Join businesses using MAXG to build smarter, scale faster, and compete in the 4IR economy.</p>
           <div style={{ display: "flex", gap: "1rem", justifyContent: "center", flexWrap: "wrap" }}>
-            <button className="btn-p" onClick={() => setPage("demo")} style={{ padding: ".9rem 2rem", fontSize: ".95rem", boxShadow: "0 0 30px rgba(59,130,246,0.6)" }}><Icon name="smart_toy" size={18} /> Try Demo Free</button>
             <button className="btn-s" onClick={() => setPage("contact")} style={{ padding: ".9rem 2rem", fontSize: ".95rem" }}><Icon name="mail" size={18} /> Contact Us</button>
           </div>
         </div>
