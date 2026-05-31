@@ -1141,7 +1141,7 @@ export default function App() {
   // Load ARIA widget once on mount
   useEffect(() => {
     window.ARIAWidgetConfig = {
-      theme: "light";
+      theme: "light",
       botName: "ARIA",
       welcomeMsg: "Hey! 👋 I'm ARIA. How can I help?",
       quickReplies: ["Pricing", "AI services", "Book demo"],
