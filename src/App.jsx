@@ -1156,7 +1156,7 @@ export default function App() {
     };
 
     const script = document.createElement("script");
-    script.src = "https://aria-v2-sooty.vercel.app/widget.js";
+    script.src = "https://aria-v4-three.vercel.app//widget.js";
     script.async = true;
     document.body.appendChild(script);
 
