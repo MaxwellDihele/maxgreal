@@ -1144,8 +1144,7 @@ export default function App() {
       theme: "light",
       botName: "ARIA",
       welcomeMsg: "Hey! 👋 I'm ARIA. How can I help?",
-      quickReplies: ["Pricing", "AI services", "Book demo"],
-
+      quickReplies: ["AI services", "Pricing", "Web dev", "Database", "Book demo", "Help"],
       social: {
         whatsapp:  "https://wa.me/27650576778",   // replace with your number
         instagram: "https://instagram.com/maxgtech", // replace with your handle
